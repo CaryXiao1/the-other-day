@@ -3,7 +3,7 @@ from flask import Flask, Response, request
 from dotenv import dotenv_values
 from pymongo import MongoClient
 import certifi
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 
 
@@ -35,6 +35,29 @@ def get_todays_question():
         return Response(json.dumps(today_question), mimetype="application/json")
     else:
         return Response(json.dumps({"error": "No question found for today"}), 
+                       status=404, 
+                       mimetype="application/json")
+
+# Gets yesterday's date and returns the corresponding question.
+@app.route('/yesterday/get-question/')
+def get_yesterdays_question():
+    
+    client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
+    db = client[config["DB_NAME"]]
+    questions = db["questions"]  # Fixed collection name to match read_tables.py
+    # Get yesterday's date in the format stored in the database
+    yesterday = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+    # Find the question for yesterday
+    yesterday_question = questions.find_one({"date": yesterday})
+    client.close()
+    
+    if yesterday_question:
+        # Convert ObjectId to string for JSON serialization
+        yesterday_question["_id"] = str(yesterday_question["_id"])
+        yesterday_question["date"] = yesterday_question["date"].strftime("%m-%d-%Y")
+        return Response(json.dumps(yesterday_question), mimetype="application/json")
+    else:
+        return Response(json.dumps({"error": "No question found for yesterday"}), 
                        status=404, 
                        mimetype="application/json")
 
