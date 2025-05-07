@@ -289,6 +289,150 @@ def get_leaderboard():
         return Response(json.dumps({
             "error": str(e)
         }), status=500, mimetype="application/json")
+
+
+@app.route('/pair', methods=['GET'])
+def get_pair():
+    try:
+        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
+        db = client[config["DB_NAME"]]
+        answers = db["answers"]
+        questions = db["questions"]
+
+        # Sample two random answers from the database
+        random_answers = list(answers.aggregate([{"$sample": {"size": 2}}]))
+
+        enriched_answers = []
+        for answer in random_answers:
+            question_id = answer.get("question_id")
+            if not isinstance(question_id, ObjectId):
+                question_id = ObjectId(question_id)
+
+            question = questions.find_one({"_id": question_id})
+
+            answer["_id"] = str(answer["_id"])
+            answer["question_id"] = str(answer["question_id"])
+            answer["user_id"] = str(answer["user_id"])
+
+            if question:
+                answer["question_text"] = question["question"]
+                answer["date"] = question["date"].strftime("%m-%d-%Y")
+            else:
+                answer["question_text"] = "Unknown question"
+
+            enriched_answers.append(answer)
+
+        client.close()
+        return Response(json.dumps(enriched_answers), mimetype="application/json")
+
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, mimetype="application/json")
+
+@app.route('/answer/<answer_id>/increment-appearance', methods=['POST'])
+def increment_appearance_count(answer_id):
+    try:
+        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
+        db = client[config["DB_NAME"]]
+        answers = db["answers"]
+
+        object_id = ObjectId(answer_id)
+
+        # Increment the 'appearances' field by 1 (create it if it doesn't exist)
+        result = answers.update_one(
+            {"_id": object_id},
+            {"$inc": {"appearances": 1}}
+        )
+
+        client.close()
+
+        if result.matched_count == 0:
+            return Response(json.dumps({"error": "Answer not found"}), status=404, mimetype="application/json")
+        
+        return Response(json.dumps({"message": "Appearance count incremented"}), mimetype="application/json")
+
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, mimetype="application/json")
+    
+@app.route('/answer/<answer_id>/increment-vote', methods=['POST'])
+def increment_vote_count(answer_id):
+    try:
+        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
+        db = client[config["DB_NAME"]]
+        answers = db["answers"]
+
+        object_id = ObjectId(answer_id)
+
+        # Increment the 'votes' field by 1 (create it if it doesn't exist)
+        result = answers.update_one(
+            {"_id": object_id},
+            {"$inc": {"votes": 1}}
+        )
+
+        client.close()
+
+        if result.matched_count == 0:
+            return Response(json.dumps({"error": "Answer not found"}), status=404, mimetype="application/json")
+        
+        return Response(json.dumps({"message": "Vote count incremented"}), mimetype="application/json")
+
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, mimetype="application/json")
+    
+@app.route('/question/<question_id>/answer_leaderboard', methods=['GET'])
+def get_answer_leaderboard(question_id):
+    try:
+        from bson.objectid import ObjectId
+        object_id = ObjectId(question_id)
+
+        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
+        db = client[config["DB_NAME"]]
+        answers_col = db["answers"]
+        users_col = db["users"]
+
+        # Fetch all answers for the question
+        answer_cursor = answers_col.find({"question_id": object_id})
+
+        enriched_answers = []
+
+        for answer in answer_cursor:
+            votes = answer.get("votes", 0)
+            appearances = answer.get("appearances", 1)
+            appearances = max(appearances, 1)
+            ratio = votes / appearances
+
+            answer_id = str(answer["_id"])
+            user_id = answer.get("user_id")
+
+            # Convert fields for JSON serialization
+            answer["_id"] = answer_id
+            answer["question_id"] = str(answer["question_id"])
+            answer["user_id"] = str(user_id)
+
+            user_info = users_col.find_one({"_id": ObjectId(user_id)})
+            if user_info:
+                user_info["_id"] = str(user_info["_id"])
+            else:
+                user_info = {"_id": str(user_id), "username": "Unknown"}
+
+            enriched_answers.append({
+                "answer": answer,
+                "user": user_info,
+                "ratio": ratio
+            })
+
+        client.close()
+
+        # Sort the enriched list by ratio descending
+        sorted_output = sorted(enriched_answers, key=lambda x: x["ratio"], reverse=True)
+
+        # Drop ratio from final output
+        result = [{"answer": item["answer"], "user": item["user"]} for item in sorted_output]
+
+        return Response(json.dumps(result), mimetype="application/json")
+
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, mimetype="application/json")
+
     
 if __name__ == '__main__':
     app.debug = True
