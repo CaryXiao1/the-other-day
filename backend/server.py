@@ -291,9 +291,11 @@ def get_leaderboard():
         }), status=500, mimetype="application/json")
 
 
-app.route('/question/<question_id>/get_pair', methods=['GET'])
+@app.route('/question/<question_id>/get_pair', methods=['GET'])
 def get_pair(question_id):
     try:
+        from bson.objectid import ObjectId
+
         object_id = ObjectId(question_id)
 
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
@@ -337,6 +339,7 @@ def increment_appearance_count(answer_id):
         db = client[config["DB_NAME"]]
         answers = db["answers"]
 
+        from bson.objectid import ObjectId
         object_id = ObjectId(answer_id)
 
         # Increment the 'appearances' field by 1 (create it if it doesn't exist)
@@ -362,6 +365,7 @@ def increment_vote_count(answer_id):
         db = client[config["DB_NAME"]]
         answers = db["answers"]
 
+        from bson.objectid import ObjectId
         object_id = ObjectId(answer_id)
 
         # Increment the 'votes' field by 1 (create it if it doesn't exist)
