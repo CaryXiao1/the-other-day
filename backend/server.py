@@ -291,34 +291,36 @@ def get_leaderboard():
         }), status=500, mimetype="application/json")
 
 
-@app.route('/pair', methods=['GET'])
-def get_pair():
+app.route('/question/<question_id>/get_pair', methods=['GET'])
+def get_pair(question_id):
     try:
+        object_id = ObjectId(question_id)
+
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         answers = db["answers"]
         questions = db["questions"]
 
-        # Sample two random answers from the database
-        random_answers = list(answers.aggregate([{"$sample": {"size": 2}}]))
+        # Find the question
+        question = questions.find_one({"_id": object_id})
+        if not question:
+            client.close()
+            return Response(json.dumps({"error": "Question not found"}), status=404, mimetype="application/json")
+
+        # Sample two random answers for the given question_id
+        random_answers = list(answers.aggregate([
+            {"$match": {"question_id": object_id}},
+            {"$sample": {"size": 2}}
+        ]))
 
         enriched_answers = []
         for answer in random_answers:
-            question_id = answer.get("question_id")
-            if not isinstance(question_id, ObjectId):
-                question_id = ObjectId(question_id)
-
-            question = questions.find_one({"_id": question_id})
-
             answer["_id"] = str(answer["_id"])
             answer["question_id"] = str(answer["question_id"])
             answer["user_id"] = str(answer["user_id"])
 
-            if question:
-                answer["question_text"] = question["question"]
-                answer["date"] = question["date"].strftime("%m-%d-%Y")
-            else:
-                answer["question_text"] = "Unknown question"
+            answer["question_text"] = question["question"]
+            answer["date"] = question["date"].strftime("%m-%d-%Y")
 
             enriched_answers.append(answer)
 
