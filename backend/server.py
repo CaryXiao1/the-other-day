@@ -9,7 +9,7 @@ import json
 
 app = Flask(__name__)
 CORS(app)
-config = dotenv_values("../.env")
+config = dotenv_values("./.env")
 
 @app.route('/')
 def root():

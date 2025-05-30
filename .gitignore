@@ -3,6 +3,7 @@
 */raw_data/
 raw_data/
 .expo/
+*/.vscode/
 #################################################################
 # The rest of this file was copied from 
 # https://github.com/github/gitignore/blob/main/Python.gitignore
@@ -181,3 +182,4 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+.vercel

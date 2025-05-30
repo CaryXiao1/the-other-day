@@ -3,4 +3,4 @@ flask_cors
 pymongo
 dotenv
 certifi
-bson
+asgiref

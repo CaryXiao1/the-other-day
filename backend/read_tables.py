@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-# Python script used to set up each table.
+# Python script used to read each table.
 
 from dotenv import dotenv_values
 from pymongo import MongoClient
+import ssl
 import certifi
 
 config = dotenv_values("../.env")
-client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
+ca = certifi.where()
+client = MongoClient(config["ATLAS_URI"],  tlsCAFile=certifi.where())# , ssl_cert_reqs=ssl.CERT_NONE) # , tlsCAFile=certifi.where()
 db = client[config["DB_NAME"]]
 
 users = db["users"]
