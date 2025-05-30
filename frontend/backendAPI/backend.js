@@ -2,7 +2,7 @@ import axios from "axios";
 
 const api = axios.create({
   // For local development: http://127.0.0.1:5000
-  // for production:        https://the-other-day-iudevdkpy-cary-xiaos-projects.vercel.app/
+  // for production:        https://the-other-day-new.vercel.app
   baseURL: "http://127.0.0.1:5000",
 });
 
