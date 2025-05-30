@@ -1,12 +1,28 @@
 import { Image } from 'expo-image';
 import { Platform, StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
 
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { backendGet } from '@/backendAPI/backend';
 
 export default function HomeScreen() {
+  const [rootData, setRootData] = useState<string>('');
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await backendGet('/', {});
+        setRootData(data);
+      } catch (error) {
+        console.error('Error fetching root data:', error);
+      }
+    };
+    fetchData();
+  }, []);
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
@@ -20,6 +36,12 @@ export default function HomeScreen() {
         <ThemedText type="title">Welcome!</ThemedText>
         <HelloWave />
       </ThemedView>
+      {rootData && (
+        <ThemedView style={styles.stepContainer}>
+          <ThemedText type="subtitle">Root Endpoint Data</ThemedText>
+          <ThemedText>{rootData}</ThemedText>
+        </ThemedView>
+      )}
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 1: Try it</ThemedText>
         <ThemedText>
