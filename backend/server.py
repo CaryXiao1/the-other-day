@@ -5,6 +5,7 @@ from pymongo import MongoClient
 import certifi
 from datetime import datetime, timedelta
 import json
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
 app = Flask(__name__)
@@ -184,38 +185,37 @@ def register_user():
         user_data = request.json
         
         # Validate required fields
-        #TODO: add in email support later
-        # required_fields = ['username', 'email']
-        required_fields = ['username']
+        required_fields = ['username', 'password']
         for field in required_fields:
             if field not in user_data:
                 return Response(json.dumps({
                     "error": f"Missing required field: {field}"
                 }), status=400, mimetype="application/json")
+        print("got here 0")
         
         # Connect to database
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         users = db["users"]
         
-        # Check if username or email already exists
-        existing_user = users.find_one({
-            "$or": [
-                {"username": user_data['username']},
-                # {"email": user_data['email']}
-            ]
-        })
+        # Check if username already exists
+        existing_user = users.find_one({"username": user_data['username']})
+        print("got here 1")
         
         if existing_user:
             client.close()
             return Response(json.dumps({
-                "error": "Username or email already in use"
+                "error": "Username already in use"
             }), status=409, mimetype="application/json")
+        print("got here 1.5")
         
+        # Hash the password
+        hashed_password = generate_password_hash(user_data['password'])
+        print("got here 2")
         # Prepare user document
         new_user = {
             "username": user_data['username'],
-            # "email": user_data['email'],
+            "password": hashed_password,
             "total_points": 0,
         }
         
@@ -225,6 +225,7 @@ def register_user():
         
         if 'avatar_url' in user_data:
             new_user['avatar_url'] = user_data['avatar_url']
+        print("got here 3")
         
         # Insert new user
         result = users.insert_one(new_user)
@@ -232,11 +233,74 @@ def register_user():
         
         # Close connection
         client.close()
+        print("got here 4")
+        print(user_data['username'])
         
         return Response(json.dumps({
             "message": "User created successfully",
             "user_id": user_id
         }), status=201, mimetype="application/json")
+        
+    except Exception as e:
+        return Response(json.dumps({
+            "error": str(e)
+        }), status=500, mimetype="application/json")
+
+# Authenticate user
+@app.route('/user/login', methods=['POST'])
+def login_user():
+    try:
+        # Get login data from request body
+        login_data = request.json
+        
+        # Validate required fields
+        required_fields = ['username', 'password']
+        for field in required_fields:
+            if field not in login_data:
+                return Response(json.dumps({
+                    "error": f"Missing required field: {field}"
+                }), status=400, mimetype="application/json")
+        
+        # Connect to database
+        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
+        db = client[config["DB_NAME"]]
+        users = db["users"]
+        
+        # Find user by username
+        user = users.find_one({"username": login_data['username']})
+        
+        if not user:
+            client.close()
+            return Response(json.dumps({
+                "error": "Invalid username or password"
+            }), status=401, mimetype="application/json")
+        
+        # Verify password
+        if not check_password_hash(user['password'], login_data['password']):
+            client.close()
+            return Response(json.dumps({
+                "error": "Invalid username or password"
+            }), status=401, mimetype="application/json")
+        
+        # Prepare response data
+        user_data = {
+            "user_id": str(user["_id"]),
+            "username": user["username"],
+            "total_points": user["total_points"]
+        }
+        
+        # Add optional fields if they exist
+        if "name" in user:
+            user_data["name"] = user["name"]
+        if "avatar_url" in user:
+            user_data["avatar_url"] = user["avatar_url"]
+        
+        client.close()
+        
+        return Response(json.dumps({
+            "message": "Login successful",
+            "user": user_data
+        }), mimetype="application/json")
         
     except Exception as e:
         return Response(json.dumps({

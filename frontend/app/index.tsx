@@ -1,20 +1,43 @@
-import { StyleSheet, TextInput, TouchableOpacity, Platform } from 'react-native';
+import { StyleSheet, TextInput, TouchableOpacity, Platform, Modal, View } from 'react-native';
 import { useState } from 'react';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { backendGet } from '@/backendAPI/backend';
+import { backendGet, auth } from '@/backendAPI/backend';
 import { router } from 'expo-router';
+import { AxiosError } from 'axios';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [showError, setShowError] = useState(false);
 
   const handleLogin = async () => {
     try {
-      // TODO: Implement actual login logic
-      console.log('Login attempted with:', email);
+      const response = await auth('/user/login', {
+        username: username,
+        password: password,
+      });
+      
+      router.push({
+        pathname: '/logged-in',
+        params: { username: username }
+      });
     } catch (error) {
       console.error('Login error:', error);
+      const axiosError = error as AxiosError;
+      if (axiosError.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        setError('Invalid username or password');
+      } else if (axiosError.request) {
+        // The request was made but no response was received
+        setError('Server is not responding. Please try again later.');
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        setError('An unexpected error occurred. Please try again.');
+      }
+      setShowError(true);
     }
   };
 
@@ -24,16 +47,34 @@ export default function LoginScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showError}
+        onRequestClose={() => setShowError(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ThemedText style={styles.errorText}>{error}</ThemedText>
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setShowError(false)}
+            >
+              <ThemedText style={styles.closeButtonText}>Close</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <ThemedView style={styles.formContainer}>
         <ThemedText type="title" style={styles.title}>the other day...</ThemedText>
         
         <TextInput
           style={styles.input}
-          placeholder="Email"
+          placeholder="Username"
           placeholderTextColor="#666"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
+          value={username}
+          onChangeText={setUsername}
           autoCapitalize="none"
         />
         
@@ -129,6 +170,36 @@ const styles = StyleSheet.create({
   },
   registerLink: {
     color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
+    maxWidth: 400,
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+  closeButton: {
+    backgroundColor: '#007AFF',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
