@@ -9,60 +9,44 @@ import {
 import { useState } from "react";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { backendGet, auth } from "@/backendAPI/backend";
 import { router } from "expo-router";
-import { auth } from "@/backendAPI/backend";
 import { AxiosError } from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export default function RegisterScreen() {
+export default function LoginScreen() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [showError, setShowError] = useState(false);
 
-  const handleRegister = async () => {
+  const handleLogin = async () => {
     try {
-      // Validate fields
-      if (!username.trim()) {
-        setError("Username cannot be empty");
-        setShowError(true);
-        return;
-      }
-      if (!password.trim()) {
-        setError("Password cannot be empty");
-        setShowError(true);
-        return;
-      }
-      if (password !== confirmPassword) {
-        setError("Passwords do not match");
-        setShowError(true);
-        return;
-      }
-
-      const response = await auth("/user/register", {
+      const response = await auth("/user/login", {
         username: username,
         password: password,
       });
-      router.push({
-        pathname: "/",
-        params: { username: username, user_id: response.user.user_id },
-      });
+      console.log("Login success:", response.user);
+
+      await AsyncStorage.setItem("user_id", response.user.user_id);
+
+      router.push("/(tabs)");
     } catch (error) {
-      console.error("Registration error:", error);
+      console.error("Login error:", error);
       const axiosError = error as AxiosError;
       if (axiosError.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
-        setError("Username already exists");
+        setError("Invalid username or password");
       } else if (axiosError.request) {
-        // The request was made but no response was received
         setError("Server is not responding. Please try again later.");
       } else {
-        // Something happened in setting up the request that triggered an Error
         setError("An unexpected error occurred. Please try again.");
       }
       setShowError(true);
     }
+  };
+
+  const handleRegister = () => {
+    router.push("/register");
   };
 
   return (
@@ -88,7 +72,7 @@ export default function RegisterScreen() {
 
       <ThemedView style={styles.formContainer}>
         <ThemedText type="title" style={styles.title}>
-          Create Account
+          the other day...
         </ThemedText>
 
         <TextInput
@@ -109,28 +93,22 @@ export default function RegisterScreen() {
           secureTextEntry
         />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Confirm Password"
-          placeholderTextColor="#666"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-        />
-
-        <TouchableOpacity
-          style={styles.registerButton}
-          onPress={handleRegister}
-        >
-          <ThemedText style={styles.registerButtonText}>Register</ThemedText>
+        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+          <ThemedText style={styles.loginButtonText}>Log In</ThemedText>
         </TouchableOpacity>
 
-        <ThemedView style={styles.loginContainer}>
-          <ThemedText style={styles.loginText}>
-            Already have an account?{" "}
+        <TouchableOpacity style={styles.forgotPassword}>
+          <ThemedText style={styles.forgotPasswordText}>
+            Forgot Password?
           </ThemedText>
-          <TouchableOpacity onPress={() => router.push("/")}>
-            <ThemedText style={styles.loginLink}>Log In</ThemedText>
+        </TouchableOpacity>
+
+        <ThemedView style={styles.registerContainer}>
+          <ThemedText style={styles.registerText}>
+            Don't have an account?{" "}
+          </ThemedText>
+          <TouchableOpacity onPress={handleRegister}>
+            <ThemedText style={styles.registerLink}>Register</ThemedText>
           </TouchableOpacity>
         </ThemedView>
       </ThemedView>
@@ -156,6 +134,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     marginBottom: 20,
     textAlign: "center",
+    fontStyle: "italic",
   },
   input: {
     height: 50,
@@ -170,7 +149,7 @@ const styles = StyleSheet.create({
       web: "#fff",
     }),
   },
-  registerButton: {
+  loginButton: {
     backgroundColor: "#007AFF",
     height: 50,
     borderRadius: 8,
@@ -178,21 +157,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
-  registerButtonText: {
+  loginButtonText: {
     color: "#fff",
     fontSize: 18,
     fontWeight: "600",
   },
-  loginContainer: {
+  forgotPassword: {
+    alignItems: "center",
+    marginTop: 15,
+  },
+  forgotPasswordText: {
+    color: "#007AFF",
+    fontSize: 16,
+  },
+  registerContainer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     marginTop: 20,
   },
-  loginText: {
+  registerText: {
     fontSize: 16,
   },
-  loginLink: {
+  registerLink: {
     color: "#007AFF",
     fontSize: 16,
     fontWeight: "600",
