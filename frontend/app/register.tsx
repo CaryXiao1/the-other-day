@@ -37,9 +37,10 @@ export default function RegisterScreen() {
         password: password,
       });
       console.log(response)
+
       // After successful registration, navigate to login
       router.push({
-        pathname: '/logged-in',
+        pathname: '/home',
         params: { username: username }
       });    
     } catch (error) {

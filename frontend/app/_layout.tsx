@@ -26,7 +26,7 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="register" />
-        <Stack.Screen name="logged-in" />
+        <Stack.Screen name="home" />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

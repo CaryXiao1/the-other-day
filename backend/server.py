@@ -6,6 +6,7 @@ import certifi
 from datetime import datetime, timedelta
 import json
 from werkzeug.security import generate_password_hash, check_password_hash
+from bson.objectid import ObjectId
 
 
 app = Flask(__name__)
@@ -19,7 +20,6 @@ def root():
 # Gets the current date and returns the corresponding question.
 @app.route('/today/get-question/')
 def get_todays_question():
-    
     client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
     db = client[config["DB_NAME"]]
     questions = db["questions"]
@@ -48,6 +48,7 @@ def get_yesterdays_question():
     questions = db["questions"]
     # Get yesterday's date in the format stored in the database
     yesterday = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+    print("DEBUG: querying for date =", yesterday.isoformat())
     # Find the question for yesterday
     yesterday_question = questions.find_one({"date": yesterday})
     client.close()
@@ -197,7 +198,8 @@ def register_user():
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         users = db["users"]
-        
+        print("got here 0.5")
+
         # Check if username already exists
         existing_user = users.find_one({"username": user_data['username']})
         print("got here 1")
@@ -240,7 +242,7 @@ def register_user():
             "message": "User created successfully",
             "user_id": user_id
         }), status=201, mimetype="application/json")
-        
+
     except Exception as e:
         return Response(json.dumps({
             "error": str(e)
@@ -358,43 +360,84 @@ def get_leaderboard():
 @app.route('/question/<question_id>/get_pair', methods=['GET'])
 def get_pair(question_id):
     try:
-        from bson.objectid import ObjectId
+        print(f"\nDEBUG: get_pair called with question_id = {question_id}")
 
-        object_id = ObjectId(question_id)
+        # 1) Convert question_id to ObjectId
+        try:
+            object_id = ObjectId(question_id)
+            print("DEBUG: converted to ObjectId")
+        except Exception as e:
+            print("ERROR: question_id is not a valid ObjectId:", e)
+            return Response(
+                json.dumps({"error": "Invalid question_id format"}),
+                status=400,
+                mimetype="application/json"
+            )
 
+        # 2) Connect to Mongo
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
-        answers = db["answers"]
-        questions = db["questions"]
+        answers_col = db["answers"]
+        questions_col = db["questions"]
 
-        # Find the question
-        question = questions.find_one({"_id": object_id})
-        if not question:
+        # 3) Verify the question exists
+        question_doc = questions_col.find_one({"_id": object_id})
+        if not question_doc:
+            print("DEBUG: No question found with that _id")
             client.close()
-            return Response(json.dumps({"error": "Question not found"}), status=404, mimetype="application/json")
+            return Response(
+                json.dumps({"error": "Question not found"}),
+                status=404,
+                mimetype="application/json"
+            )
+        print("DEBUG: found question, text =", question_doc.get("question"))
 
-        # Sample two random answers for the given question_id
-        random_answers = list(answers.aggregate([
+        # 4) Count how many answers exist for this question_id (just for logging)
+        count = answers_col.count_documents({"question_id": object_id})
+        print(f"DEBUG: count of answers for this question = {count}")
+
+        # 5) Sample two random answers
+        raw_answers = list(answers_col.aggregate([
             {"$match": {"question_id": object_id}},
             {"$sample": {"size": 2}}
         ]))
+        print("DEBUG: raw sampled answers (before cleaning) =", raw_answers)
 
+        # 6) Build a clean, JSON‐serializable list
         enriched_answers = []
-        for answer in random_answers:
-            answer["_id"] = str(answer["_id"])
-            answer["question_id"] = str(answer["question_id"])
-            answer["user_id"] = str(answer["user_id"])
-
-            answer["question_text"] = question["question"]
-            answer["date"] = question["date"].strftime("%m-%d-%Y")
-
-            enriched_answers.append(answer)
+        for ans in raw_answers:
+            clean_ans = {
+                "_id": str(ans["_id"]),
+                "question_id": str(ans["question_id"]),
+                "user_id": str(ans["user_id"]),
+                # copy your actual answer text field (e.g. "answer_text" or similar):
+                "answer_text": ans.get("answer_text", ""),
+                "votes": ans.get("votes", 0),
+                "appearances": ans.get("appearances", 0),
+                # If ans has a created_at datetime, convert it to an ISO string (or remove it):
+                # "created_at": ans.get("created_at", None).isoformat() if ans.get("created_at") else None,
+                
+                # Add the question text + date (formatted as MM-DD-YYYY)
+                "question_text": question_doc["question"],
+                "date": question_doc["date"].strftime("%m-%d-%Y")
+            }
+            enriched_answers.append(clean_ans)
 
         client.close()
-        return Response(json.dumps(enriched_answers), mimetype="application/json")
+        print("DEBUG: returning enriched answers:", enriched_answers)
+
+        return Response(
+            json.dumps(enriched_answers),
+            mimetype="application/json"
+        )
 
     except Exception as e:
-        return Response(json.dumps({"error": str(e)}), status=500, mimetype="application/json")
+        print("ERROR in get_pair:", e)
+        return Response(
+            json.dumps({"error": str(e)}),
+            status=500,
+            mimetype="application/json"
+        )
 
 @app.route('/answer/<answer_id>/increment-appearance', methods=['POST'])
 def increment_appearance_count(answer_id):
@@ -451,58 +494,183 @@ def increment_vote_count(answer_id):
 @app.route('/question/<question_id>/answer_leaderboard', methods=['GET'])
 def get_answer_leaderboard(question_id):
     try:
-        from bson.objectid import ObjectId
-        object_id = ObjectId(question_id)
+        # 1) Convert question_id to ObjectId (400 if invalid)
+        try:
+            object_id = ObjectId(question_id)
+        except Exception as e:
+            return Response(
+                json.dumps({"error": "Invalid question_id format"}),
+                status=400,
+                mimetype="application/json"
+            )
 
+        # 2) Connect to MongoDB
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         answers_col = db["answers"]
         users_col = db["users"]
 
-        # Fetch all answers for the question
+        # 3) Fetch all answer documents for this question
         answer_cursor = answers_col.find({"question_id": object_id})
 
-        enriched_answers = []
-
-        for answer in answer_cursor:
-            votes = answer.get("votes", 0)
-            appearances = answer.get("appearances", 1)
+        enriched = []
+        for ans in answer_cursor:
+            # Compute votes / appearances ratio
+            votes = ans.get("votes", 0)
+            appearances = ans.get("appearances", 1)
             appearances = max(appearances, 1)
             ratio = votes / appearances
 
-            answer_id = str(answer["_id"])
-            user_id = answer.get("user_id")
+            # 4) Build a clean answer object (no datetime fields)
+            clean_ans = {
+                "_id": str(ans["_id"]),
+                "question_id": str(ans["question_id"]),
+                "user_id": str(ans["user_id"]),
+                # Adjust this key if your answer text is stored under a different field name
+                "answer_text": ans.get("answer_text", ""),
+                "votes": votes,
+                "appearances": appearances,
+                # If you do want any date (e.g. created_at), convert it here:
+                # "created_at": ans["created_at"].isoformat() if ans.get("created_at") else None
+            }
 
-            # Convert fields for JSON serialization
-            answer["_id"] = answer_id
-            answer["question_id"] = str(answer["question_id"])
-            answer["user_id"] = str(user_id)
-
-            user_info = users_col.find_one({"_id": ObjectId(user_id)})
-            if user_info:
-                user_info["_id"] = str(user_info["_id"])
+            # 5) Lookup the user who posted this answer
+            user_doc = users_col.find_one({"_id": ObjectId(ans["user_id"])})
+            if user_doc:
+                clean_user = {
+                    "_id": str(user_doc["_id"]),
+                    "username": user_doc.get("username", ""),
+                    # If you store extras, include them as strings, e.g.:
+                    # "name": user_doc.get("name", ""),
+                    # "avatar_url": user_doc.get("avatar_url", "")
+                }
             else:
-                user_info = {"_id": str(user_id), "username": "Unknown"}
+                clean_user = {
+                    "_id": str(ans["user_id"]),
+                    "username": "Unknown"
+                }
 
-            enriched_answers.append({
-                "answer": answer,
-                "user": user_info,
+            enriched.append({
+                "answer": clean_ans,
+                "user": clean_user,
                 "ratio": ratio
             })
 
         client.close()
 
-        # Sort the enriched list by ratio descending
-        sorted_output = sorted(enriched_answers, key=lambda x: x["ratio"], reverse=True)
+        # 6) Sort by ratio descending
+        enriched.sort(key=lambda x: x["ratio"], reverse=True)
 
-        # Drop ratio from final output
-        result = [{"answer": item["answer"], "user": item["user"]} for item in sorted_output]
+        # 7) Drop the ratio before returning
+        result = [{"answer": item["answer"], "user": item["user"]} for item in enriched]
 
         return Response(json.dumps(result), mimetype="application/json")
 
     except Exception as e:
-        return Response(json.dumps({"error": str(e)}), status=500, mimetype="application/json")
+        # Catch any unexpected error
+        return Response(
+            json.dumps({"error": str(e)}),
+            status=500,
+            mimetype="application/json"
+        )
 
+@app.route('/answer', methods=['POST'])
+def create_answer():
+    try:
+        data = request.json or {}
+        required_fields = ["user_id", "question_id", "answer_text"]
+        for f in required_fields:
+            if f not in data:
+                return Response(
+                    json.dumps({"error": f"Missing required field: {f}"}),
+                    status=400,
+                    mimetype="application/json"
+                )
+
+        # Convert string IDs into ObjectId
+        user_oid = ObjectId(data["user_id"])
+        question_oid = ObjectId(data["question_id"])
+
+        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
+        db = client[config["DB_NAME"]]
+        answers_col = db["answers"]
+
+        # ─── Check for an existing answer by this user for this question ───
+        existing = answers_col.find_one({
+            "user_id": user_oid,
+            "question_id": question_oid
+        })
+        if existing:
+            client.close()
+            return Response(
+                json.dumps({"error": "You have already submitted an answer"}),
+                status=409,
+                mimetype="application/json"
+            )
+
+        # Insert new answer:
+        new_ans = {
+            "user_id": user_oid,
+            "question_id": question_oid,
+            "answer_text": data["answer_text"],
+            "votes": 0,
+            "appearances": 0,
+            "created_at": datetime.utcnow()
+        }
+        result = answers_col.insert_one(new_ans)
+        client.close()
+
+        return Response(
+            json.dumps({
+                "message": "Answer created",
+                "answer_id": str(result.inserted_id)
+            }),
+            status=201,
+            mimetype="application/json"
+        )
+
+    except Exception as e:
+        return Response(
+            json.dumps({"error": str(e)}),
+            status=500,
+            mimetype="application/json"
+        )
+
+@app.route('/user/username/<username>', methods=['GET'])
+def get_user_by_username(username: str):
+    try:
+        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
+        db = client[config["DB_NAME"]]
+        users = db["users"]
+
+        user = users.find_one({"username": username})
+        client.close()
+
+        if not user:
+            return Response(
+                json.dumps({"error": "User not found"}),
+                status=404,
+                mimetype="application/json"
+            )
+
+        # Convert _id to string
+        user["_id"] = str(user["_id"])
+        # Only return the fields you need (for example, _id and username):
+        return Response(
+            json.dumps({
+                "user_id": user["_id"],
+                "username": user["username"],
+                "total_points": user.get("total_points", 0),
+                # …any other fields you want…
+            }),
+            mimetype="application/json"
+        )
+    except Exception as e:
+        return Response(
+            json.dumps({"error": str(e)}),
+            status=500,
+            mimetype="application/json"
+        )
     
 if __name__ == '__main__':
     app.debug = True

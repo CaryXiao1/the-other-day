@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const api = axios.create({
+export const api = axios.create({
   // For local development: http://127.0.0.1:5000
   // for production:        https://the-other-day-new.vercel.app
   baseURL: "http://127.0.0.1:5000",
@@ -51,7 +51,6 @@ export const backendPost = async (endpoint, session, setSession, payload) => {
     throw error;
   }
 };
-
 
 export const auth = async (endpoint, params) => {
   const response = await api.post(endpoint, params);

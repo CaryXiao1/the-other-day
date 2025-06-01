@@ -18,10 +18,10 @@ export default function LoginScreen() {
         username: username,
         password: password,
       });
-      
+
       router.push({
-        pathname: '/logged-in',
-        params: { username: username }
+        pathname: '/home',
+        params: {username: username }
       });
     } catch (error) {
       console.error('Login error:', error);
