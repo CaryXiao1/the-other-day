@@ -45,7 +45,7 @@ export default function RegisterScreen() {
       });
       router.push({
         pathname: "/",
-        params: { username: username, user_id: response.user.user_id },
+        params: { username: username, user_id: response.user_id },
       });
     } catch (error) {
       console.error("Registration error:", error);
