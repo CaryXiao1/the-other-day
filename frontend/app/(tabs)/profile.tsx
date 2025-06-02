@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Modal,
+  ActivityIndicator,
 } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -19,6 +20,26 @@ const handleLogout = async () => {
   await AsyncStorage.removeItem("user_id");
   router.replace("/login");
 };
+
+// Loading Component
+const LoadingScreen = () => (
+  <ThemedView style={styles.loadingContainer}>
+    <View style={styles.loadingContent}>
+      <ActivityIndicator size="large" color="#007AFF" />
+      <ThemedText style={styles.loadingText}>
+        Loading your profile...
+      </ThemedText>
+      <View style={styles.loadingPlaceholders}>
+        {/* Avatar placeholder */}
+        <View style={styles.avatarLoadingPlaceholder} />
+        {/* Name placeholder */}
+        <View style={styles.textLoadingPlaceholder} />
+        {/* Points placeholder */}
+        <View style={[styles.textLoadingPlaceholder, { width: 100 }]} />
+      </View>
+    </View>
+  </ThemedView>
+);
 
 export default function ProfileScreen() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -78,12 +99,9 @@ export default function ProfileScreen() {
     fetchProfileData();
   }, [userId]);
 
-  if (loading) {
-    return (
-      <ThemedView style={styles.container}>
-        <ThemedText>Loading...</ThemedText>
-      </ThemedView>
-    );
+  // Show loading screen while fetching data OR while userId is being loaded
+  if (loading || (userId && !userData)) {
+    return <LoadingScreen />;
   }
 
   if (!userId) {
@@ -279,6 +297,42 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
+  // Loading screen styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loadingContent: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+  },
+  loadingPlaceholders: {
+    marginTop: 40,
+    alignItems: "center",
+  },
+  avatarLoadingPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#e0e0e0",
+    marginBottom: 20,
+  },
+  textLoadingPlaceholder: {
+    height: 20,
+    width: 150,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 4,
+    marginBottom: 10,
+  },
+  // Existing styles
   header: { alignItems: "center", marginBottom: 20 },
   avatar: { width: 80, height: 80, borderRadius: 40 },
   avatarPlaceholder: {
