@@ -13,6 +13,24 @@ app = Flask(__name__)
 CORS(app)
 config = dotenv_values("./.env")
 
+def serialize_document(doc):
+    """Helper function to serialize MongoDB documents for JSON response"""
+    if doc is None:
+        return None
+    
+    # Convert ObjectId to string
+    if "_id" in doc:
+        doc["_id"] = str(doc["_id"])
+    
+    # Convert any ObjectId fields to strings
+    for key, value in doc.items():
+        if isinstance(value, ObjectId):
+            doc[key] = str(value)
+        elif isinstance(value, datetime):
+            doc[key] = value.strftime("%m-%d-%Y")
+    
+    return doc
+
 @app.route('/')
 def root():
     return "Hello World!"
@@ -81,8 +99,8 @@ def get_user(user_id):
         client.close()
         
         if user:
-            # Convert ObjectId to string for JSON serialization
-            user["_id"] = str(user["_id"])
+            # Serialize the user document properly
+            user = serialize_document(user)
             return Response(json.dumps(user), mimetype="application/json")
         else:
             return Response(json.dumps({"error": "User not found"}), 
@@ -119,13 +137,18 @@ def get_top_answers(user_id):
                 
             question = questions.find_one({"_id": question_id})
             if question:
-                answer["_id"] = str(answer["_id"])
-                answer["question_id"] = str(answer["question_id"])
-                answer["user_id"] = str(answer["user_id"])
-                # Add question text to the answer
-                answer["question_text"] = question["question"]
-                answer["date"] = question["date"].strftime("%m-%d-%Y")
-                result.append(answer)
+                # Clean serialization
+                clean_answer = {
+                    "_id": str(answer["_id"]),
+                    "question_id": str(answer["question_id"]),
+                    "user_id": str(answer["user_id"]),
+                    "answer_text": answer.get("answer_text", ""),
+                    "votes": answer.get("votes", 0),
+                    "appearances": answer.get("appearances", 0),
+                    "question_text": question["question"],
+                    "date": question["date"].strftime("%m-%d-%Y")
+                }
+                result.append(clean_answer)
         
         client.close()
         
@@ -219,6 +242,7 @@ def register_user():
             "username": user_data['username'],
             "password": hashed_password,
             "total_points": 0,
+            "created_at": datetime.utcnow()
         }
         
         # Add optional fields if provided
@@ -284,11 +308,11 @@ def login_user():
                 "error": "Invalid username or password"
             }), status=401, mimetype="application/json")
         
-        # Prepare response data
+        # Prepare response data (clean serialization)
         user_data = {
             "user_id": str(user["_id"]),
             "username": user["username"],
-            "total_points": user["total_points"]
+            "total_points": user.get("total_points", 0)
         }
         
         # Add optional fields if they exist
@@ -332,7 +356,7 @@ def get_leaderboard():
             user_data = {
                 "user_id": str(user["_id"]),
                 "username": user["username"],
-                "total_points": user["total_points"],
+                "total_points": user.get("total_points", 0),
                 "rank": index + 1  # Add 1 because ranks start at 1, not 0
             }
             
@@ -410,13 +434,9 @@ def get_pair(question_id):
                 "_id": str(ans["_id"]),
                 "question_id": str(ans["question_id"]),
                 "user_id": str(ans["user_id"]),
-                # copy your actual answer text field (e.g. "answer_text" or similar):
                 "answer_text": ans.get("answer_text", ""),
                 "votes": ans.get("votes", 0),
                 "appearances": ans.get("appearances", 0),
-                # If ans has a created_at datetime, convert it to an ISO string (or remove it):
-                # "created_at": ans.get("created_at", None).isoformat() if ans.get("created_at") else None,
-                
                 # Add the question text + date (formatted as MM-DD-YYYY)
                 "question_text": question_doc["question"],
                 "date": question_doc["date"].strftime("%m-%d-%Y")
@@ -526,12 +546,9 @@ def get_answer_leaderboard(question_id):
                 "_id": str(ans["_id"]),
                 "question_id": str(ans["question_id"]),
                 "user_id": str(ans["user_id"]),
-                # Adjust this key if your answer text is stored under a different field name
                 "answer_text": ans.get("answer_text", ""),
                 "votes": votes,
-                "appearances": appearances,
-                # If you do want any date (e.g. created_at), convert it here:
-                # "created_at": ans["created_at"].isoformat() if ans.get("created_at") else None
+                "appearances": appearances
             }
 
             # 5) Lookup the user who posted this answer
@@ -540,14 +557,15 @@ def get_answer_leaderboard(question_id):
                 clean_user = {
                     "_id": str(user_doc["_id"]),
                     "username": user_doc.get("username", ""),
-                    # If you store extras, include them as strings, e.g.:
-                    # "name": user_doc.get("name", ""),
-                    # "avatar_url": user_doc.get("avatar_url", "")
+                    "name": user_doc.get("name", ""),
+                    "avatar_url": user_doc.get("avatar_url", "")
                 }
             else:
                 clean_user = {
                     "_id": str(ans["user_id"]),
-                    "username": "Unknown"
+                    "username": "Unknown",
+                    "name": "",
+                    "avatar_url": ""
                 }
 
             enriched.append({
@@ -653,15 +671,14 @@ def get_user_by_username(username: str):
                 mimetype="application/json"
             )
 
-        # Convert _id to string
-        user["_id"] = str(user["_id"])
-        # Only return the fields you need (for example, _id and username):
+        # Clean serialization - only return safe fields
         return Response(
             json.dumps({
-                "user_id": user["_id"],
+                "user_id": str(user["_id"]),
                 "username": user["username"],
                 "total_points": user.get("total_points", 0),
-                # …any other fields you want…
+                "name": user.get("name", ""),
+                "avatar_url": user.get("avatar_url", "")
             }),
             mimetype="application/json"
         )
