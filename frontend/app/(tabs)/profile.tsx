@@ -100,11 +100,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <ThemedView style={styles.container}>
-        {loading ? (
-          <View style={styles.errorContainer}>
-            <ThemedText>Loading profile...</ThemedText>
-          </View>
-        ) : userData ? (
+        {userData ? (
           <>
             <View style={styles.header}>
               {userData.avatar_url ? (
@@ -131,35 +127,34 @@ export default function ProfileScreen() {
               )}
             </View>
 
-            <View style={styles.section}>
-              <ThemedText type="subtitle" style={styles.sectionTitle}>
-                Top Answers
-              </ThemedText>
-              {topAnswers && topAnswers.length > 0 ? (
-                <FlatList
-                  data={topAnswers}
-                  keyExtractor={(item) => item._id}
-                  renderItem={({ item }) => (
-                    <View style={styles.answerItem}>
-                      <ThemedText style={styles.questionText}>
-                        {item.question_text} ({item.date})
-                      </ThemedText>
-                      <ThemedText style={styles.answerText}>
-                        Answer: {item.answer}
-                      </ThemedText>
-                      <ThemedText style={styles.votesText}>
-                        Votes: {item.votes || 0}
-                      </ThemedText>
-                    </View>
-                  )}
-                />
-              ) : (
-                <ThemedText>No answers yet</ThemedText>
-              )}
-            </View>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Top Answers
+            </ThemedText>
+            {topAnswers && topAnswers.length > 0 ? (
+              <FlatList
+                data={topAnswers.slice(0, 2)}
+                keyExtractor={(item) => item._id}
+                renderItem={({ item }) => (
+                  <View style={styles.answerItem}>
+                    <ThemedText style={styles.questionText}>
+                      {item.question_text} ({item.date})
+                    </ThemedText>
+                    <ThemedText style={styles.answerText}>
+                      Answer: {item.answer}
+                    </ThemedText>
+                    <ThemedText style={styles.votesText}>
+                      Votes: {item.votes || 0}
+                    </ThemedText>
+                  </View>
+                )}
+                ListEmptyComponent={<ThemedText>No answers yet</ThemedText>}
+              />
+            ) : (
+              <ThemedText>No answers yet</ThemedText>
+            )}
 
             {leaderboard && leaderboard.length > 0 && (
-              <View style={[styles.section, styles.leaderboardContainer]}>
+              <>
                 <ThemedText type="subtitle" style={styles.sectionTitle}>
                   Global Leaderboard
                 </ThemedText>
@@ -170,7 +165,6 @@ export default function ProfileScreen() {
                 )}
                 <FlatList
                   data={leaderboard}
-                  showsVerticalScrollIndicator={true}
                   keyExtractor={(item) => item.user_id}
                   renderItem={({ item }) => {
                     const isCurrentUser = item.user_id === userId;
@@ -191,7 +185,6 @@ export default function ProfileScreen() {
                             #{item.rank}
                           </ThemedText>
                         </View>
-
                         <View style={styles.userInfoContainer}>
                           {item.avatar_url ? (
                             <Image
@@ -212,7 +205,6 @@ export default function ProfileScreen() {
                               </ThemedText>
                             </View>
                           )}
-
                           <View style={styles.userDetails}>
                             <ThemedText
                               style={[
@@ -237,8 +229,9 @@ export default function ProfileScreen() {
                     );
                   }}
                   style={styles.leaderboardList}
+                  showsVerticalScrollIndicator={true}
                 />
-              </View>
+              </>
             )}
 
             <TouchableOpacity

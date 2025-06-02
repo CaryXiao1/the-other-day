@@ -442,7 +442,6 @@ export default function HomeScreen() {
           <ThemedText style={styles.errorText}>{leaderboardError}</ThemedText>
         ) : null}
 
-        {/* Bottom Padding */}
         <View style={{ height: 60 }} />
       </ScrollView>
     </ThemedView>
