@@ -29,6 +29,10 @@ export default function LoginScreen() {
       console.log("Login success:", response.user);
 
       await AsyncStorage.setItem("user_id", response.user.user_id);
+      await AsyncStorage.setItem(
+        "username",
+        response.user.username || username
+      );
 
       router.push("/(tabs)");
     } catch (error) {

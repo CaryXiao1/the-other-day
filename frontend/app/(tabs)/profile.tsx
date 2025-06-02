@@ -7,6 +7,7 @@ import {
   Text,
   TouchableOpacity,
   SafeAreaView,
+  Modal,
 } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -26,6 +27,7 @@ export default function ProfileScreen() {
   const [ranking, setRanking] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   useEffect(() => {
     const loadUserId = async () => {
@@ -48,8 +50,6 @@ export default function ProfileScreen() {
       }
 
       try {
-        console.log("Fetching profile data for user:", userId);
-
         const userResponse = await backendGet(`/user/${userId}`);
         setUserData(userResponse.data || userResponse);
 
@@ -69,7 +69,6 @@ export default function ProfileScreen() {
         );
       } catch (error) {
         console.error("Error fetching profile data:", error);
-        console.error("Error details:", error.response?.data || error.message);
       } finally {
         setLoading(false);
       }
@@ -132,6 +131,7 @@ export default function ProfileScreen() {
             </ThemedText>
             {topAnswers && topAnswers.length > 0 ? (
               <FlatList
+                style={{ flexGrow: 0 }}
                 data={topAnswers.slice(0, 2)}
                 keyExtractor={(item) => item._id}
                 renderItem={({ item }) => (
@@ -153,9 +153,23 @@ export default function ProfileScreen() {
               <ThemedText>No answers yet</ThemedText>
             )}
 
-            {leaderboard && leaderboard.length > 0 && (
-              <>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
+            <TouchableOpacity
+              onPress={() => setShowLeaderboard(true)}
+              style={styles.leaderboardButton}
+            >
+              <Text style={styles.leaderboardButtonText}>
+                View Global Leaderboard
+              </Text>
+            </TouchableOpacity>
+
+            <Modal
+              animationType="slide"
+              transparent={false}
+              visible={showLeaderboard}
+              onRequestClose={() => setShowLeaderboard(false)}
+            >
+              <SafeAreaView style={styles.modalContainer}>
+                <ThemedText style={styles.modalTitle}>
                   Global Leaderboard
                 </ThemedText>
                 {ranking && (
@@ -228,11 +242,16 @@ export default function ProfileScreen() {
                       </View>
                     );
                   }}
-                  style={styles.leaderboardList}
-                  showsVerticalScrollIndicator={true}
+                  //   showsVerticalScrollIndicator={true}
                 />
-              </>
-            )}
+                <TouchableOpacity
+                  onPress={() => setShowLeaderboard(false)}
+                  style={styles.closeButton}
+                >
+                  <Text style={styles.closeButtonText}>Close</Text>
+                </TouchableOpacity>
+              </SafeAreaView>
+            </Modal>
 
             <TouchableOpacity
               onPress={handleLogout}
@@ -293,6 +312,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 15,
     fontWeight: "600",
+    marginLeft: 12,
+    marginRight: 12,
   },
   leaderboardContainer: {
     borderWidth: 2,
@@ -311,6 +332,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#e0e0e0",
+    marginLeft: 10,
+    marginRight: 10,
   },
   currentUserItem: { backgroundColor: "#007AFF10", borderColor: "#007AFF" },
   rankContainer: { width: 40, alignItems: "center" },
@@ -357,4 +380,40 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loginButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
+  leaderboardButton: {
+    marginTop: 10,
+    padding: 15,
+    backgroundColor: "#007AFF",
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  leaderboardButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalContainer: {
+    flex: 1,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  closeButton: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: "#FF3B30",
+    borderRadius: 8,
+    alignItems: "center",
+    marginLeft: 12,
+    marginRight: 12,
+  },
+  closeButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
 });

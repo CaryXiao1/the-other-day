@@ -5,14 +5,16 @@ import {
   View,
   ActivityIndicator,
   ScrollView,
+  SafeAreaView,
 } from "react-native";
 import { useState, useEffect } from "react";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { useLocalSearchParams, router } from "expo-router";
+import { router } from "expo-router";
 import { backendGet } from "@/backendAPI/backend";
 import { api } from "@/backendAPI/backend";
 import axios, { AxiosError, isAxiosError } from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Question = {
   _id: string;
@@ -42,16 +44,12 @@ type LeaderboardEntry = {
 };
 
 export default function HomeScreen() {
-  const { username } = useLocalSearchParams<{
-    username: string;
-  }>();
-
+  const [username, setUsername] = useState<string>("");
   const [userId, setUserId] = useState<string | null>(null);
-  const [fetchUserError, setFetchUserError] = useState("");
   const [hasAnsweredToday, setHasAnsweredToday] = useState(false);
 
   //
-  // ─── TODAY’S QUESTION STATE ──────────────────────────────────────────────────
+  // ─── TODAY'S QUESTION STATE ──────────────────────────────────────────────────
   //
   const [todayQuestion, setTodayQuestion] = useState<Question | null>(null);
   const [todayAnswerText, setTodayAnswerText] = useState("");
@@ -59,7 +57,7 @@ export default function HomeScreen() {
   const [todayError, setTodayError] = useState("");
 
   //
-  // ─── YESTERDAY’S QUESTION + PAIR STATE ───────────────────────────────────────
+  // ─── YESTERDAY'S QUESTION + PAIR STATE ───────────────────────────────────────
   //
   const [yesterdayQuestion, setYesterdayQuestion] = useState<Question | null>(
     null
@@ -77,31 +75,39 @@ export default function HomeScreen() {
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState("");
 
-  // Get userid from username
+  // Load user data from AsyncStorage
   useEffect(() => {
-    const lookupUserId = async () => {
+    const loadUserData = async () => {
       try {
-        // Calls GET /user/username/<username>
-        const data: { user_id: string; username: string } = await backendGet(
-          `/user/username/${username}`
-        );
-        setUserId(data.user_id);
-      } catch (err) {
-        console.error("Error fetching user by username:", err);
-        if (isAxiosError(err) && err.response) {
-          setFetchUserError(
-            (err.response.data as any)?.error || `Status ${err.response.status}`
-          );
-        } else {
-          setFetchUserError("Could not look up user ID.");
+        const storedUserId = await AsyncStorage.getItem("user_id");
+        const storedUsername = await AsyncStorage.getItem("username");
+
+        console.log("Loaded user_id:", storedUserId);
+        console.log("Loaded username:", storedUsername);
+
+        if (storedUserId) {
+          setUserId(storedUserId);
         }
+
+        if (storedUsername) {
+          setUsername(storedUsername);
+        }
+
+        // If no user data, redirect to login
+        if (!storedUserId || !storedUsername) {
+          router.replace("/login");
+        }
+      } catch (error) {
+        console.error("Error loading user data:", error);
+        router.replace("/login");
       }
     };
-    lookupUserId();
-  }, [username]);
+
+    loadUserData();
+  }, []);
 
   //
-  // ─── FETCH TODAY’S QUESTION ON MOUNT ────────────────────────────────────────
+  // ─── FETCH TODAY'S QUESTION ON MOUNT ────────────────────────────────────────
   //
   useEffect(() => {
     const fetchToday = async () => {
@@ -110,7 +116,7 @@ export default function HomeScreen() {
         const data: Question = await backendGet("/today/get-question/");
         setTodayQuestion(data);
       } catch (err) {
-        console.warn("Could not fetch today’s question:", err);
+        console.warn("Could not fetch today's question:", err);
         setTodayError("No question found for today or server error.");
       }
     };
@@ -118,7 +124,7 @@ export default function HomeScreen() {
   }, []);
 
   //
-  // ─── FETCH YESTERDAY’S QUESTION ON MOUNT ────────────────────────────────────
+  // ─── FETCH YESTERDAY'S QUESTION ON MOUNT ────────────────────────────────────
   //     AND IMMEDIATELY LOAD A PAIR + LEADERBOARD
   //
   useEffect(() => {
@@ -129,7 +135,7 @@ export default function HomeScreen() {
 
         await Promise.all([fetchPair(data._id), fetchLeaderboard(data._id)]);
       } catch (err) {
-        console.warn("Could not fetch yesterday’s question:", err);
+        console.warn("Could not fetch yesterday's question:", err);
         setPairError("No question found for yesterday or server error.");
         setLeaderboardError("Cannot load leaderboard without a question.");
       }
@@ -138,7 +144,7 @@ export default function HomeScreen() {
   }, []);
 
   //
-  // ─── HELPER: FETCH A NEW “PAIR” OF ANSWERS FOR A GIVEN QUESTION ID ───────────
+  // ─── HELPER: FETCH A NEW "PAIR" OF ANSWERS FOR A GIVEN QUESTION ID ───────────
   //
   const fetchPair = async (questionId: string) => {
     setLoadingPair(true);
@@ -248,7 +254,7 @@ export default function HomeScreen() {
   };
 
   //
-  // ─── HANDLER: SUBMIT TODAY’S ANSWER ─────────────────────────────────────────
+  // ─── HANDLER: SUBMIT TODAY'S ANSWER ─────────────────────────────────────────
   //
   const handleSubmitTodayAnswer = async () => {
     if (!todayQuestion) return;
@@ -273,10 +279,10 @@ export default function HomeScreen() {
       setTodayAnswerText("");
       setTodayError("Answer submitted!");
 
-      // Mark locally that they’ve answered:
+      // Mark locally that they've answered:
       setHasAnsweredToday(true);
     } catch (err) {
-      console.error("Error submitting today’s answer:", err);
+      console.error("Error submitting today's answer:", err);
       if (isAxiosError(err) && err.response) {
         if (err.response.status === 409) {
           setTodayError("You already submitted an answer today.");
@@ -293,158 +299,174 @@ export default function HomeScreen() {
     }
   };
 
+  // Show loading if username is not yet loaded
+  if (!username) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" />
+          <ThemedText style={styles.loadingText}>Loading...</ThemedText>
+        </View>
+      </ThemedView>
+    );
+  }
+
   //
   // ─── RENDER ─────────────────────────────────────────────────────────────────
   //
   return (
-    <ThemedView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* ─────────────────────────────────────────────────────────────────────
-                Section 1: Greet + Today’s Question
-            ───────────────────────────────────────────────────────────────────── */}
-        <ThemedText type="title" style={styles.header}>
-          Hello, {username}!
-        </ThemedText>
-        <ThemedText type="subtitle" style={styles.subheader}>
-          Today’s Question:
-        </ThemedText>
-        {todayQuestion ? (
-          <ThemedView style={styles.card}>
-            <ThemedText style={styles.questionText}>
-              {todayQuestion.question}
-            </ThemedText>
-
-            {hasAnsweredToday ? (
-              <ThemedText style={styles.infoText}>
-                You’ve already submitted today’s answer.
-              </ThemedText>
-            ) : (
-              <>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Type your answer here…"
-                  placeholderTextColor="#666"
-                  value={todayAnswerText}
-                  onChangeText={setTodayAnswerText}
-                />
-
-                <TouchableOpacity
-                  style={styles.submitButton}
-                  onPress={handleSubmitTodayAnswer}
-                  disabled={isSubmittingTodayAnswer}
-                >
-                  {isSubmittingTodayAnswer ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <ThemedText style={styles.submitButtonText}>
-                      Submit Answer
-                    </ThemedText>
-                  )}
-                </TouchableOpacity>
-                {todayError ? (
-                  <ThemedText style={styles.errorText}>{todayError}</ThemedText>
-                ) : null}
-              </>
-            )}
-          </ThemedView>
-        ) : (
-          <ActivityIndicator style={{ marginVertical: 20 }} />
-        )}
-
-        {/* Spacer */}
-        <View style={{ height: 32 }} />
-
-        {/* ─────────────────────────────────────────────────────────────────────
-                Section 2: Yesterday’s Question + Voting Pair
-            ───────────────────────────────────────────────────────────────────── */}
-        <ThemedText type="subtitle" style={styles.subheader}>
-          Yesterday’s Question:
-        </ThemedText>
-        {yesterdayQuestion ? (
-          <ThemedView style={styles.card}>
-            <ThemedText style={styles.questionText}>
-              {yesterdayQuestion.question}
-            </ThemedText>
-
-            {loadingPair ? (
-              <ActivityIndicator style={{ marginVertical: 20 }} />
-            ) : pairAnswers.length === 2 ? (
-              pairAnswers.map((ans, idx) => (
-                <ThemedView key={ans._id} style={styles.answerCard}>
-                  <ThemedText style={styles.answerText}>
-                    {ans.answer_text}
-                  </ThemedText>
-                  <TouchableOpacity
-                    style={styles.voteButton}
-                    onPress={() => handleVote(ans._id)}
-                  >
-                    <ThemedText style={styles.voteButtonText}>
-                      Vote for Answer {idx + 1}
-                    </ThemedText>
-                  </TouchableOpacity>
-                </ThemedView>
-              ))
-            ) : (
-              <ThemedText>No answers available right now.</ThemedText>
-            )}
-
-            {pairError ? (
-              <ThemedText style={styles.errorText}>{pairError}</ThemedText>
-            ) : null}
-
-            <TouchableOpacity
-              style={styles.nextPairButton}
-              onPress={() =>
-                yesterdayQuestion && fetchPair(yesterdayQuestion._id)
-              }
-            >
-              <ThemedText style={styles.nextPairText}>Next Pair →</ThemedText>
-            </TouchableOpacity>
-          </ThemedView>
-        ) : (
-          <ActivityIndicator style={{ marginVertical: 20 }} />
-        )}
-
-        {/* Spacer */}
-        <View style={{ height: 32 }} />
-
-        {/* ─────────────────────────────────────────────────────────────────────
-                Section 3: The Day Before Yesterday's Leaderboard
-            ───────────────────────────────────────────────────────────────────── */}
-        <ThemedText type="subtitle" style={styles.subheader}>
-          The Other Day's Leaderboard:
-        </ThemedText>
-        {loadingLeaderboard ? (
-          <ActivityIndicator style={{ marginVertical: 20 }} />
-        ) : leaderboardEntries.length ? (
-          leaderboardEntries.map((item, idx) => (
-            <ThemedView key={item.answer._id} style={styles.leaderboardCard}>
-              <ThemedText style={styles.rankText}>#{idx + 1}</ThemedText>
-              <ThemedText style={styles.answerText}>
-                {item.answer.answer_text}
-              </ThemedText>
-              <ThemedText style={styles.byLine}>
-                — {item.user.username}
-              </ThemedText>
-              <ThemedText style={styles.ratioText}>
-                Votes: {item.answer.votes ?? 0} Appearances:{" "}
-                {item.answer.appearances ?? 0}
-              </ThemedText>
-            </ThemedView>
-          ))
-        ) : (
-          <ThemedText style={styles.noLeaderboardText}>
-            No leaderboard entries yet.
+    <SafeAreaView style={{ flex: 1 }}>
+      <ThemedView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {/* ─────────────────────────────────────────────────────────────────────
+                  Section 1: Greet + Today's Question
+              ───────────────────────────────────────────────────────────────────── */}
+          <ThemedText type="title" style={styles.header}>
+            Hello, {username}!
           </ThemedText>
-        )}
+          <ThemedText type="subtitle" style={styles.subheader}>
+            Today's Question:
+          </ThemedText>
+          {todayQuestion ? (
+            <ThemedView style={styles.card}>
+              <ThemedText style={styles.questionText}>
+                {todayQuestion.question}
+              </ThemedText>
 
-        {leaderboardError ? (
-          <ThemedText style={styles.errorText}>{leaderboardError}</ThemedText>
-        ) : null}
+              {hasAnsweredToday ? (
+                <ThemedText style={styles.infoText}>
+                  You've already submitted today's answer.
+                </ThemedText>
+              ) : (
+                <>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Type your answer here…"
+                    placeholderTextColor="#666"
+                    value={todayAnswerText}
+                    onChangeText={setTodayAnswerText}
+                  />
 
-        <View style={{ height: 60 }} />
-      </ScrollView>
-    </ThemedView>
+                  <TouchableOpacity
+                    style={styles.submitButton}
+                    onPress={handleSubmitTodayAnswer}
+                    disabled={isSubmittingTodayAnswer}
+                  >
+                    {isSubmittingTodayAnswer ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <ThemedText style={styles.submitButtonText}>
+                        Submit Answer
+                      </ThemedText>
+                    )}
+                  </TouchableOpacity>
+                  {todayError ? (
+                    <ThemedText style={styles.errorText}>
+                      {todayError}
+                    </ThemedText>
+                  ) : null}
+                </>
+              )}
+            </ThemedView>
+          ) : (
+            <ActivityIndicator style={{ marginVertical: 20 }} />
+          )}
+
+          {/* Spacer */}
+          <View style={{ height: 32 }} />
+
+          {/* ─────────────────────────────────────────────────────────────────────
+                  Section 2: Yesterday's Question + Voting Pair
+              ───────────────────────────────────────────────────────────────────── */}
+          <ThemedText type="subtitle" style={styles.subheader}>
+            Yesterday's Question:
+          </ThemedText>
+          {yesterdayQuestion ? (
+            <ThemedView style={styles.card}>
+              <ThemedText style={styles.questionText}>
+                {yesterdayQuestion.question}
+              </ThemedText>
+
+              {loadingPair ? (
+                <ActivityIndicator style={{ marginVertical: 20 }} />
+              ) : pairAnswers.length === 2 ? (
+                pairAnswers.map((ans, idx) => (
+                  <ThemedView key={ans._id} style={styles.answerCard}>
+                    <ThemedText style={styles.answerText}>
+                      {ans.answer_text}
+                    </ThemedText>
+                    <TouchableOpacity
+                      style={styles.voteButton}
+                      onPress={() => handleVote(ans._id)}
+                    >
+                      <ThemedText style={styles.voteButtonText}>
+                        Vote for Answer {idx + 1}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </ThemedView>
+                ))
+              ) : (
+                <ThemedText>No answers available right now.</ThemedText>
+              )}
+
+              {pairError ? (
+                <ThemedText style={styles.errorText}>{pairError}</ThemedText>
+              ) : null}
+
+              <TouchableOpacity
+                style={styles.nextPairButton}
+                onPress={() =>
+                  yesterdayQuestion && fetchPair(yesterdayQuestion._id)
+                }
+              >
+                <ThemedText style={styles.nextPairText}>Next Pair →</ThemedText>
+              </TouchableOpacity>
+            </ThemedView>
+          ) : (
+            <ActivityIndicator style={{ marginVertical: 20 }} />
+          )}
+
+          {/* Spacer */}
+          <View style={{ height: 32 }} />
+
+          {/* ─────────────────────────────────────────────────────────────────────
+                  Section 3: The Day Before Yesterday's Leaderboard
+              ───────────────────────────────────────────────────────────────────── */}
+          <ThemedText type="subtitle" style={styles.subheader}>
+            The Other Day's Leaderboard:
+          </ThemedText>
+          {loadingLeaderboard ? (
+            <ActivityIndicator style={{ marginVertical: 20 }} />
+          ) : leaderboardEntries.length ? (
+            leaderboardEntries.map((item, idx) => (
+              <ThemedView key={item.answer._id} style={styles.leaderboardCard}>
+                <ThemedText style={styles.rankText}>#{idx + 1}</ThemedText>
+                <ThemedText style={styles.answerText}>
+                  {item.answer.answer_text}
+                </ThemedText>
+                <ThemedText style={styles.byLine}>
+                  — {item.user.username}
+                </ThemedText>
+                <ThemedText style={styles.ratioText}>
+                  Votes: {item.answer.votes ?? 0} Appearances:{" "}
+                  {item.answer.appearances ?? 0}
+                </ThemedText>
+              </ThemedView>
+            ))
+          ) : (
+            <ThemedText style={styles.noLeaderboardText}>
+              No leaderboard entries yet.
+            </ThemedText>
+          )}
+
+          {leaderboardError ? (
+            <ThemedText style={styles.errorText}>{leaderboardError}</ThemedText>
+          ) : null}
+
+          <View style={{ height: 60 }} />
+        </ScrollView>
+      </ThemedView>
+    </SafeAreaView>
   );
 }
 
@@ -455,6 +477,15 @@ const styles = StyleSheet.create({
   scrollContainer: {
     padding: 20,
     paddingBottom: 60,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
   },
 
   // ─── HEADERS ────────────────────────────────────────────────────────────
@@ -490,7 +521,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  // ─── TODAY’S QUESTION STYLES ───────────────────────────────────────────
+  // ─── TODAY'S QUESTION STYLES ───────────────────────────────────────────
   questionText: {
     fontSize: 18,
     marginBottom: 12,
@@ -516,6 +547,14 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  infoText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    padding: 12,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 8,
   },
 
   // ─── PAIR ANSWERS STYLES ───────────────────────────────────────────────
