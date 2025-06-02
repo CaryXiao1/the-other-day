@@ -108,168 +108,160 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <ThemedView style={styles.container}>
-          {userData ? (
-            <>
-              <View style={styles.header}>
-                {userData.avatar_url ? (
-                  <Image
-                    source={{ uri: userData.avatar_url }}
-                    style={styles.avatar}
-                  />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <ThemedText style={styles.avatarPlaceholderText}>
-                      {(userData.name || userData.username)
-                        ?.charAt(0)
-                        .toUpperCase() || "?"}
+      <ThemedView style={styles.container}>
+        {userData ? (
+          <>
+            <View style={styles.header}>
+              {userData.avatar_url ? (
+                <Image
+                  source={{ uri: userData.avatar_url }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <ThemedText style={styles.avatarPlaceholderText}>
+                    {(userData.name || userData.username)
+                      ?.charAt(0)
+                      .toUpperCase() || "?"}
+                  </ThemedText>
+                </View>
+              )}
+              <ThemedText style={styles.username}>
+                {userData.name || userData.username || "Unknown User"}
+              </ThemedText>
+              {userData.total_points !== undefined && (
+                <ThemedText style={styles.points}>
+                  {userData.total_points} points
+                </ThemedText>
+              )}
+            </View>
+
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Top Answers
+            </ThemedText>
+            {topAnswers && topAnswers.length > 0 ? (
+              <FlatList
+                data={topAnswers.slice(0, 2)}
+                keyExtractor={(item) => item._id}
+                renderItem={({ item }) => (
+                  <View style={styles.answerItem}>
+                    <ThemedText style={styles.questionText}>
+                      {item.question_text} ({item.date})
+                    </ThemedText>
+                    <ThemedText style={styles.answerText}>
+                      Answer: {item.answer}
+                    </ThemedText>
+                    <ThemedText style={styles.votesText}>
+                      Votes: {item.votes || 0}
                     </ThemedText>
                   </View>
                 )}
-                <ThemedText style={styles.username}>
-                  {userData.name || userData.username || "Unknown User"}
-                </ThemedText>
-                {userData.total_points !== undefined && (
-                  <ThemedText style={styles.points}>
-                    {userData.total_points} points
-                  </ThemedText>
-                )}
-              </View>
+                ListEmptyComponent={<ThemedText>No answers yet</ThemedText>}
+              />
+            ) : (
+              <ThemedText>No answers yet</ThemedText>
+            )}
 
-              <View style={styles.section}>
+            {leaderboard && leaderboard.length > 0 && (
+              <>
                 <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  Top Answers
+                  Global Leaderboard
                 </ThemedText>
-                {topAnswers && topAnswers.length > 0 ? (
-                  <FlatList
-                    data={topAnswers.slice(0, 2)} // Only show top 2 answers
-                    keyExtractor={(item) => item._id}
-                    renderItem={({ item }) => (
-                      <View style={styles.answerItem}>
-                        <ThemedText style={styles.questionText}>
-                          {item.question_text} ({item.date})
-                        </ThemedText>
-                        <ThemedText style={styles.answerText}>
-                          Answer: {item.answer}
-                        </ThemedText>
-                        <ThemedText style={styles.votesText}>
-                          Votes: {item.votes || 0}
-                        </ThemedText>
-                      </View>
-                    )}
-                  />
-                ) : (
-                  <ThemedText>No answers yet</ThemedText>
-                )}
-              </View>
-
-              {leaderboard && leaderboard.length > 0 && (
-                <View style={styles.section}>
-                  <ThemedText type="subtitle" style={styles.sectionTitle}>
-                    Global Leaderboard
+                {ranking && (
+                  <ThemedText style={styles.rankingText}>
+                    Your Rank: {ranking.rank} out of {ranking.total_users} users
                   </ThemedText>
-                  {ranking && (
-                    <ThemedText style={styles.rankingText}>
-                      Your Rank: {ranking.rank} out of {ranking.total_users}{" "}
-                      users
-                    </ThemedText>
-                  )}
-                  <FlatList
-                    data={leaderboard}
-                    keyExtractor={(item) => item.user_id}
-                    renderItem={({ item }) => {
-                      const isCurrentUser = item.user_id === userId;
-                      return (
-                        <View
-                          style={[
-                            styles.leaderboardItem,
-                            isCurrentUser && styles.currentUserItem,
-                          ]}
-                        >
-                          <View style={styles.rankContainer}>
+                )}
+                <FlatList
+                  data={leaderboard}
+                  keyExtractor={(item) => item.user_id}
+                  renderItem={({ item }) => {
+                    const isCurrentUser = item.user_id === userId;
+                    return (
+                      <View
+                        style={[
+                          styles.leaderboardItem,
+                          isCurrentUser && styles.currentUserItem,
+                        ]}
+                      >
+                        <View style={styles.rankContainer}>
+                          <ThemedText
+                            style={[
+                              styles.rankNumber,
+                              isCurrentUser && styles.currentUserText,
+                            ]}
+                          >
+                            #{item.rank}
+                          </ThemedText>
+                        </View>
+                        <View style={styles.userInfoContainer}>
+                          {item.avatar_url ? (
+                            <Image
+                              source={{ uri: item.avatar_url }}
+                              style={styles.leaderboardAvatar}
+                            />
+                          ) : (
+                            <View
+                              style={[
+                                styles.leaderboardAvatarPlaceholder,
+                                isCurrentUser && styles.currentUserAvatar,
+                              ]}
+                            >
+                              <ThemedText style={styles.leaderboardAvatarText}>
+                                {(item.name || item.username)
+                                  ?.charAt(0)
+                                  .toUpperCase() || "?"}
+                              </ThemedText>
+                            </View>
+                          )}
+                          <View style={styles.userDetails}>
                             <ThemedText
                               style={[
-                                styles.rankNumber,
+                                styles.leaderboardUsername,
                                 isCurrentUser && styles.currentUserText,
                               ]}
                             >
-                              #{item.rank}
+                              {item.name || item.username}
+                              {isCurrentUser && " (You)"}
+                            </ThemedText>
+                            <ThemedText
+                              style={[
+                                styles.leaderboardPoints,
+                                isCurrentUser && styles.currentUserText,
+                              ]}
+                            >
+                              {item.total_points} points
                             </ThemedText>
                           </View>
-
-                          <View style={styles.userInfoContainer}>
-                            {item.avatar_url ? (
-                              <Image
-                                source={{ uri: item.avatar_url }}
-                                style={styles.leaderboardAvatar}
-                              />
-                            ) : (
-                              <View
-                                style={[
-                                  styles.leaderboardAvatarPlaceholder,
-                                  isCurrentUser && styles.currentUserAvatar,
-                                ]}
-                              >
-                                <ThemedText
-                                  style={styles.leaderboardAvatarText}
-                                >
-                                  {(item.name || item.username)
-                                    ?.charAt(0)
-                                    .toUpperCase() || "?"}
-                                </ThemedText>
-                              </View>
-                            )}
-
-                            <View style={styles.userDetails}>
-                              <ThemedText
-                                style={[
-                                  styles.leaderboardUsername,
-                                  isCurrentUser && styles.currentUserText,
-                                ]}
-                              >
-                                {item.name || item.username}
-                                {isCurrentUser && " (You)"}
-                              </ThemedText>
-                              <ThemedText
-                                style={[
-                                  styles.leaderboardPoints,
-                                  isCurrentUser && styles.currentUserText,
-                                ]}
-                              >
-                                {item.total_points} points
-                              </ThemedText>
-                            </View>
-                          </View>
                         </View>
-                      );
-                    }}
-                    style={styles.leaderboardList}
-                    showsVerticalScrollIndicator={false}
-                  />
-                </View>
-              )}
+                      </View>
+                    );
+                  }}
+                  style={styles.leaderboardList}
+                  showsVerticalScrollIndicator={true}
+                />
+              </>
+            )}
 
-              <TouchableOpacity
-                onPress={handleLogout}
-                style={styles.logoutButton}
-              >
-                <Text style={styles.logoutText}>Log Out</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <View style={styles.errorContainer}>
-              <ThemedText>Unable to load profile data</ThemedText>
-              <TouchableOpacity
-                onPress={() => router.replace("/login")}
-                style={styles.loginButton}
-              >
-                <Text style={styles.loginButtonText}>Go to Login</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </ThemedView>
-      </ScrollView>
+            <TouchableOpacity
+              onPress={handleLogout}
+              style={styles.logoutButton}
+            >
+              <Text style={styles.logoutText}>Log Out</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <View style={styles.errorContainer}>
+            <ThemedText>Unable to load profile data</ThemedText>
+            <TouchableOpacity
+              onPress={() => router.replace("/login")}
+              style={styles.loginButton}
+            >
+              <Text style={styles.loginButtonText}>Go to Login</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </ThemedView>
     </SafeAreaView>
   );
 }
