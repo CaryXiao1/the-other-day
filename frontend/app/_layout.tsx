@@ -17,6 +17,7 @@ export default function RootLayout() {
   });
 
   if (!loaded) {
+    // Async font loading only occurs in development.
     return null;
   }
 
@@ -30,11 +31,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
-<<<<<<< HEAD
-        <Stack.Screen name="home" />
-=======
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
->>>>>>> 0f0a080 (tabs and profile page)
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
