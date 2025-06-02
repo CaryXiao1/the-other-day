@@ -56,6 +56,7 @@ export default function ProfileScreen() {
         const topAnswersResponse = await backendGet(
           `/user/${userId}/top-answers`
         );
+        console.log(topAnswersResponse);
         setTopAnswers(topAnswersResponse.data || topAnswersResponse || []);
 
         const rankingResponse = await backendGet(`/user/${userId}/ranking`);
@@ -140,7 +141,7 @@ export default function ProfileScreen() {
                       {item.question_text} ({item.date})
                     </ThemedText>
                     <ThemedText style={styles.answerText}>
-                      Answer: {item.answer}
+                      Answer: {item.answer_text}
                     </ThemedText>
                     <ThemedText style={styles.votesText}>
                       Votes: {item.votes || 0}
