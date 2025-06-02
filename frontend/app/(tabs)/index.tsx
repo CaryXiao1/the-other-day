@@ -56,6 +56,23 @@ export default function HomeScreen() {
   const [isSubmittingTodayAnswer, setIsSubmittingTodayAnswer] = useState(false);
   const [todayError, setTodayError] = useState("");
 
+  // Check if user has answered today's question
+  useEffect(() => {
+    const checkHasAnsweredToday = async () => {
+      if (!userId) return;
+      
+      try {
+        const data = await backendGet(`/today/has-answered/${userId}`);
+        setHasAnsweredToday(data.has_answered);
+      } catch (err) {
+        console.warn("Could not check if user has answered today:", err);
+        setHasAnsweredToday(false);
+      }
+    };
+    
+    checkHasAnsweredToday();
+  }, [userId]);
+
   //
   // ─── YESTERDAY'S QUESTION + PAIR STATE ───────────────────────────────────────
   //
