@@ -44,7 +44,7 @@ export default function RegisterScreen() {
         password: password,
       });
       router.push({
-        pathname: "/",
+        pathname: "/norms",
         params: { username: username, user_id: response.user_id },
       });
     } catch (error) {
