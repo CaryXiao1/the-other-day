@@ -251,34 +251,30 @@ def register_user():
                 return Response(json.dumps({
                     "error": f"Missing required field: {field}"
                 }), status=400, mimetype="application/json")
-        print("got here 0")
         
         # Connect to database
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         users = db["users"]
-        print("got here 0.5")
 
         # Check if username already exists
         existing_user = users.find_one({"username": user_data['username']})
-        print("got here 1")
         
         if existing_user:
             client.close()
             return Response(json.dumps({
                 "error": "Username already in use"
             }), status=409, mimetype="application/json")
-        print("got here 1.5")
         
         # Hash the password
         hashed_password = generate_password_hash(user_data['password'])
-        print("got here 2")
         # Prepare user document
         new_user = {
             "username": user_data['username'],
             "password": hashed_password,
             "total_points": 0,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.utcnow(),
+            "groups": []
         }
         
         # Add optional fields if provided
@@ -287,7 +283,6 @@ def register_user():
         
         if 'avatar_url' in user_data:
             new_user['avatar_url'] = user_data['avatar_url']
-        print("got here 3")
         
         # Insert new user
         result = users.insert_one(new_user)
