@@ -56,6 +56,47 @@ def get_todays_question():
                        status=404, 
                        mimetype="application/json")
 
+@app.route('/today/has-answered/<user_id>')
+def has_answered_today(user_id):
+    try:
+        print("DEBUG: has_answered_today")
+        # Convert string ID to ObjectId
+        object_id = ObjectId(user_id)
+        
+        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
+        db = client[config["DB_NAME"]]
+        questions = db["questions"]
+        answers = db["answers"]
+        
+        # Get today's date
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Find today's question
+        today_question = questions.find_one({"date": today})
+        if not today_question:
+            client.close()
+            return Response(json.dumps({
+                "has_answered": False,
+                "error": "No question found for today"
+            }), status=404, mimetype="application/json")
+        
+        # Check if user has answered today's question
+        existing_answer = answers.find_one({
+            "user_id": object_id,
+            "question_id": today_question["_id"]
+        })
+        
+        client.close()
+        
+        return Response(json.dumps({
+            "has_answered": existing_answer is not None
+        }), mimetype="application/json")
+        
+    except Exception as e:
+        return Response(json.dumps({
+            "error": str(e)
+        }), status=500, mimetype="application/json")
+
 # Gets yesterday's date and returns the corresponding question.
 @app.route('/yesterday/get-question/')
 def get_yesterdays_question():
