@@ -3,7 +3,7 @@ import axios from "axios";
 export const api = axios.create({
   // For local development: http://127.0.0.1:5000
   // for production:        https://the-other-day-new.vercel.app
-  baseURL: "http://127.0.0.1:5000",
+  baseURL: "https://the-other-day-new.vercel.app",
 });
 
 export const refreshSession = async (session, setSession) => {
