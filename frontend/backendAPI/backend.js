@@ -3,7 +3,7 @@ import axios from "axios";
 export const api = axios.create({
   // For local development: http://127.0.0.1:5000
   // for production:        https://the-other-day-new.vercel.app
-  baseURL: "https://the-other-day-new.vercel.app",
+  baseURL: "http://127.0.0.1:5000",
 });
 
 export const refreshSession = async (session, setSession) => {
@@ -43,7 +43,9 @@ export const backendPost = async (endpoint, session, setSession, payload) => {
         Refresh: `${session.refreshToken}`,
       };
 
-      const retryResponse = await api.post(endpoint, payload, { headers: newHeaders });
+      const retryResponse = await api.post(endpoint, payload, {
+        headers: newHeaders,
+      });
       return retryResponse.data;
     }
 

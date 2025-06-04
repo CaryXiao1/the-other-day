@@ -13,6 +13,7 @@ import { backendGet, auth } from "@/backendAPI/backend";
 import { router } from "expo-router";
 import { AxiosError } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function LoginScreen() {
   const [username, setUsername] = useState("");
@@ -75,9 +76,17 @@ export default function LoginScreen() {
       </Modal>
 
       <ThemedView style={styles.formContainer}>
-        <ThemedText type="title" style={styles.title}>
-          the other day...
-        </ThemedText>
+        <View style={styles.titleColumn}>
+          <Ionicons
+            name="book"
+            size={32}
+            color="#c0d684"
+            style={styles.bookIcon}
+          />
+          <ThemedText type="title" style={styles.title}>
+            the other day...
+          </ThemedText>
+        </View>
 
         <TextInput
           style={styles.input}
@@ -101,12 +110,6 @@ export default function LoginScreen() {
           <ThemedText style={styles.loginButtonText}>Log In</ThemedText>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.forgotPassword}>
-          <ThemedText style={styles.forgotPasswordText}>
-            Forgot Password?
-          </ThemedText>
-        </TouchableOpacity>
-
         <ThemedView style={styles.registerContainer}>
           <ThemedText style={styles.registerText}>
             Don't have an account?{" "}
@@ -121,6 +124,15 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  bookIcon: {
+    transform: [{ translateY: -2 }],
+  },
   container: {
     flex: 1,
     justifyContent: "center",
@@ -134,11 +146,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     gap: 16,
   },
-  title: {
-    fontSize: 32,
+  titleColumn: {
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 20,
-    textAlign: "center",
-    fontStyle: "italic",
   },
   input: {
     height: 50,
@@ -154,7 +165,7 @@ const styles = StyleSheet.create({
     }),
   },
   loginButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#63264a",
     height: 50,
     borderRadius: 8,
     justifyContent: "center",
@@ -171,7 +182,7 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   forgotPasswordText: {
-    color: "#007AFF",
+    color: "#63264a",
     fontSize: 16,
   },
   registerContainer: {
@@ -184,7 +195,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   registerLink: {
-    color: "#007AFF",
+    color: "#c0d684",
     fontSize: 16,
     fontWeight: "600",
   },

@@ -26,15 +26,10 @@ const LoadingScreen = () => (
   <ThemedView style={styles.loadingContainer}>
     <View style={styles.loadingContent}>
       <ActivityIndicator size="large" color="#007AFF" />
-      <ThemedText style={styles.loadingText}>
-        Loading your profile...
-      </ThemedText>
+      <ThemedText style={styles.loadingText}>Loading...</ThemedText>
       <View style={styles.loadingPlaceholders}>
-        {/* Avatar placeholder */}
         <View style={styles.avatarLoadingPlaceholder} />
-        {/* Name placeholder */}
         <View style={styles.textLoadingPlaceholder} />
-        {/* Points placeholder */}
         <View style={[styles.textLoadingPlaceholder, { width: 100 }]} />
       </View>
     </View>
@@ -77,7 +72,6 @@ export default function ProfileScreen() {
         const topAnswersResponse = await backendGet(
           `/user/${userId}/top-answers`
         );
-        console.log(topAnswersResponse);
         setTopAnswers(topAnswersResponse.data || topAnswersResponse || []);
 
         const rankingResponse = await backendGet(`/user/${userId}/ranking`);
@@ -261,7 +255,6 @@ export default function ProfileScreen() {
                       </View>
                     );
                   }}
-                  //   showsVerticalScrollIndicator={true}
                 />
                 <TouchableOpacity
                   onPress={() => setShowLeaderboard(false)}
@@ -297,7 +290,6 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
-  // Loading screen styles
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -332,7 +324,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginBottom: 10,
   },
-  // Existing styles
   header: { alignItems: "center", marginBottom: 20 },
   avatar: { width: 80, height: 80, borderRadius: 40 },
   avatarPlaceholder: {
@@ -417,7 +408,7 @@ const styles = StyleSheet.create({
   logoutButton: {
     marginTop: 30,
     padding: 15,
-    backgroundColor: "#FF3B30",
+    backgroundColor: "#63264a",
     borderRadius: 8,
     alignItems: "center",
   },
@@ -438,7 +429,7 @@ const styles = StyleSheet.create({
   leaderboardButton: {
     marginTop: 10,
     padding: 15,
-    backgroundColor: "#007AFF",
+    backgroundColor: "#c0d684",
     borderRadius: 8,
     alignItems: "center",
   },

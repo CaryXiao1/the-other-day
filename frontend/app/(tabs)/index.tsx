@@ -48,19 +48,15 @@ export default function HomeScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [hasAnsweredToday, setHasAnsweredToday] = useState(false);
 
-  //
-  // ─── TODAY'S QUESTION STATE ──────────────────────────────────────────────────
-  //
   const [todayQuestion, setTodayQuestion] = useState<Question | null>(null);
   const [todayAnswerText, setTodayAnswerText] = useState("");
   const [isSubmittingTodayAnswer, setIsSubmittingTodayAnswer] = useState(false);
   const [todayError, setTodayError] = useState("");
 
-  // Check if user has answered today's question
   useEffect(() => {
     const checkHasAnsweredToday = async () => {
       if (!userId) return;
-      
+
       try {
         const data = await backendGet(`/today/has-answered/${userId}`);
         setHasAnsweredToday(data.has_answered);
@@ -69,30 +65,25 @@ export default function HomeScreen() {
         setHasAnsweredToday(false);
       }
     };
-    
+
     checkHasAnsweredToday();
   }, [userId]);
 
-  //
-  // ─── YESTERDAY'S QUESTION + PAIR STATE ───────────────────────────────────────
-  //
   const [yesterdayQuestion, setYesterdayQuestion] = useState<Question | null>(
     null
   );
+  const [dayBeforeYesterdayQuestion, setDayBeforeYesterdayQuestion] =
+    useState<Question | null>(null);
   const [pairAnswers, setPairAnswers] = useState<Answer[]>([]);
   const [loadingPair, setLoadingPair] = useState(false);
   const [pairError, setPairError] = useState("");
 
-  //
-  // ─── LEADERBOARD STATE ───────────────────────────────────────────────────────
-  //
   const [leaderboardEntries, setLeaderboardEntries] = useState<
     LeaderboardEntry[]
   >([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState("");
 
-  // Load user data from AsyncStorage
   useEffect(() => {
     const loadUserData = async () => {
       try {
@@ -110,7 +101,6 @@ export default function HomeScreen() {
           setUsername(storedUsername);
         }
 
-        // If no user data, redirect to login
         if (!storedUserId || !storedUsername) {
           router.replace("/login");
         }
@@ -123,13 +113,9 @@ export default function HomeScreen() {
     loadUserData();
   }, []);
 
-  //
-  // ─── FETCH TODAY'S QUESTION ON MOUNT ────────────────────────────────────────
-  //
   useEffect(() => {
     const fetchToday = async () => {
       try {
-        // backendGet(...) returns response.data directly
         const data: Question = await backendGet("/today/get-question/");
         setTodayQuestion(data);
       } catch (err) {
@@ -140,17 +126,19 @@ export default function HomeScreen() {
     fetchToday();
   }, []);
 
-  //
-  // ─── FETCH YESTERDAY'S QUESTION ON MOUNT ────────────────────────────────────
-  //     AND IMMEDIATELY LOAD A PAIR + LEADERBOARD
-  //
   useEffect(() => {
     const fetchYesterdayData = async () => {
       try {
         const data: Question = await backendGet("/yesterday/get-question/");
         setYesterdayQuestion(data);
-
-        await Promise.all([fetchPair(data._id), fetchLeaderboard(data._id)]);
+        const dayBeforeYesterdayData: Question = await backendGet(
+          "/day-before-yesterday/get-question/"
+        );
+        setDayBeforeYesterdayQuestion(dayBeforeYesterdayData);
+        await Promise.all([
+          fetchPair(data._id),
+          fetchLeaderboard(dayBeforeYesterdayData._id),
+        ]);
       } catch (err) {
         console.warn("Could not fetch yesterday's question:", err);
         setPairError("No question found for yesterday or server error.");
@@ -160,18 +148,13 @@ export default function HomeScreen() {
     fetchYesterdayData();
   }, []);
 
-  //
-  // ─── HELPER: FETCH A NEW "PAIR" OF ANSWERS FOR A GIVEN QUESTION ID ───────────
-  //
   const fetchPair = async (questionId: string) => {
     setLoadingPair(true);
     setPairError("");
     try {
-      console.log(`▶️ fetchPair: calling /question/${questionId}/get_pair`);
       const data: Answer[] = await backendGet(
         `/question/${questionId}/get_pair`
       );
-      console.log("◀️ fetchPair: response data:", data);
 
       if (!Array.isArray(data)) {
         throw new Error(`Expected an array but got: ${JSON.stringify(data)}`);
@@ -198,20 +181,13 @@ export default function HomeScreen() {
     }
   };
 
-  //
-  // ─── HELPER: FETCH THE LEADERBOARD FOR A GIVEN QUESTION ID ───────────────────
-  //
   const fetchLeaderboard = async (questionId: string) => {
     setLoadingLeaderboard(true);
     setLeaderboardError("");
     try {
-      console.log(
-        `▶️ fetchLeaderboard: calling /question/${questionId}/answer_leaderboard`
-      );
       const data: LeaderboardEntry[] = await backendGet(
         `/question/${questionId}/answer_leaderboard`
       );
-      console.log("◀️ fetchLeaderboard: response data:", data);
       setLeaderboardEntries(data);
     } catch (err) {
       console.error("fetchLeaderboard error:", err);
@@ -234,22 +210,10 @@ export default function HomeScreen() {
   const handleVote = async (answerId: string) => {
     if (!yesterdayQuestion) return;
 
-    console.log(`▶️ handleVote: voting for answer ${answerId}`);
     try {
-      // 1) Send the POST
       const resp = await api.post(`/answer/${answerId}/increment-vote`);
-      console.log(
-        "◀️ handleVote: response status",
-        resp.status,
-        "data:",
-        resp.data
-      );
 
-      // 2) Refresh pair + leaderboard
-      await Promise.all([
-        fetchPair(yesterdayQuestion._id),
-        fetchLeaderboard(yesterdayQuestion._id),
-      ]);
+      await Promise.all([fetchPair(yesterdayQuestion._id)]);
     } catch (err) {
       console.error("handleVote error:", err);
 
@@ -270,9 +234,6 @@ export default function HomeScreen() {
     }
   };
 
-  //
-  // ─── HANDLER: SUBMIT TODAY'S ANSWER ─────────────────────────────────────────
-  //
   const handleSubmitTodayAnswer = async () => {
     if (!todayQuestion) return;
     if (!userId) {
@@ -292,11 +253,9 @@ export default function HomeScreen() {
         question_id: todayQuestion._id,
         answer_text: todayAnswerText.trim(),
       });
-      console.log("/answer success:", resp.status, resp.data);
       setTodayAnswerText("");
       setTodayError("Answer submitted!");
 
-      // Mark locally that they've answered:
       setHasAnsweredToday(true);
     } catch (err) {
       console.error("Error submitting today's answer:", err);
@@ -316,7 +275,6 @@ export default function HomeScreen() {
     }
   };
 
-  // Show loading if username is not yet loaded
   if (!username) {
     return (
       <ThemedView style={styles.container}>
@@ -328,16 +286,10 @@ export default function HomeScreen() {
     );
   }
 
-  //
-  // ─── RENDER ─────────────────────────────────────────────────────────────────
-  //
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <ThemedView style={styles.container}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* ─────────────────────────────────────────────────────────────────────
-                  Section 1: Greet + Today's Question
-              ───────────────────────────────────────────────────────────────────── */}
           <ThemedText type="title" style={styles.header}>
             Hello, {username}!
           </ThemedText>
@@ -389,12 +341,8 @@ export default function HomeScreen() {
             <ActivityIndicator style={{ marginVertical: 20 }} />
           )}
 
-          {/* Spacer */}
           <View style={{ height: 32 }} />
 
-          {/* ─────────────────────────────────────────────────────────────────────
-                  Section 2: Yesterday's Question + Voting Pair
-              ───────────────────────────────────────────────────────────────────── */}
           <ThemedText type="subtitle" style={styles.subheader}>
             Yesterday's Question:
           </ThemedText>
@@ -443,12 +391,7 @@ export default function HomeScreen() {
             <ActivityIndicator style={{ marginVertical: 20 }} />
           )}
 
-          {/* Spacer */}
           <View style={{ height: 32 }} />
-
-          {/* ─────────────────────────────────────────────────────────────────────
-                  Section 3: The Day Before Yesterday's Leaderboard
-              ───────────────────────────────────────────────────────────────────── */}
           <ThemedText type="subtitle" style={styles.subheader}>
             The Other Day's Leaderboard:
           </ThemedText>
@@ -505,7 +448,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  // ─── HEADERS ────────────────────────────────────────────────────────────
   header: {
     fontSize: 28,
     textAlign: "center",
@@ -516,7 +458,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  // ─── CARDS ──────────────────────────────────────────────────────────────
   card: {
     backgroundColor: "#fff",
     padding: 16,
@@ -538,7 +479,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  // ─── TODAY'S QUESTION STYLES ───────────────────────────────────────────
   questionText: {
     fontSize: 18,
     marginBottom: 12,
@@ -554,7 +494,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   submitButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#c0d684",
     borderRadius: 8,
     height: 44,
     justifyContent: "center",
@@ -574,7 +514,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
 
-  // ─── PAIR ANSWERS STYLES ───────────────────────────────────────────────
   answerCard: {
     backgroundColor: "#f2f2f2",
     padding: 12,
@@ -586,7 +525,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   voteButton: {
-    backgroundColor: "#34C759",
+    backgroundColor: "#63264a",
     height: 40,
     borderRadius: 6,
     justifyContent: "center",
@@ -601,11 +540,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   nextPairText: {
-    color: "#007AFF",
+    color: "#3d0b37",
     fontSize: 16,
   },
 
-  // ─── LEADERBOARD STYLES ────────────────────────────────────────────────
   rankText: {
     fontSize: 16,
     fontWeight: "600",
@@ -628,7 +566,6 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
 
-  // ─── ERRORS & LOADING ──────────────────────────────────────────────────
   errorText: {
     color: "#FF3B30",
     fontSize: 14,
