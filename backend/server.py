@@ -8,7 +8,6 @@ import json
 from werkzeug.security import generate_password_hash, check_password_hash
 from bson.objectid import ObjectId
 
-
 app = Flask(__name__)
 CORS(app)
 config = dotenv_values("./.env")
@@ -57,47 +56,6 @@ def get_todays_question():
                        status=404, 
                        mimetype="application/json")
 
-@app.route('/today/has-answered/<user_id>')
-def has_answered_today(user_id):
-    try:
-        print("DEBUG: has_answered_today")
-        # Convert string ID to ObjectId
-        object_id = ObjectId(user_id)
-        
-        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
-        db = client[config["DB_NAME"]]
-        questions = db["questions"]
-        answers = db["answers"]
-        
-        # Get today's date
-        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        
-        # Find today's question
-        today_question = questions.find_one({"date": today})
-        if not today_question:
-            client.close()
-            return Response(json.dumps({
-                "has_answered": False,
-                "error": "No question found for today"
-            }), status=404, mimetype="application/json")
-        
-        # Check if user has answered today's question
-        existing_answer = answers.find_one({
-            "user_id": object_id,
-            "question_id": today_question["_id"]
-        })
-        
-        client.close()
-        
-        return Response(json.dumps({
-            "has_answered": existing_answer is not None
-        }), mimetype="application/json")
-        
-    except Exception as e:
-        return Response(json.dumps({
-            "error": str(e)
-        }), status=500, mimetype="application/json")
-
 # Gets yesterday's date and returns the corresponding question.
 @app.route('/yesterday/get-question/')
 def get_yesterdays_question():
@@ -107,7 +65,6 @@ def get_yesterdays_question():
     questions = db["questions"]
     # Get yesterday's date in the format stored in the database
     yesterday = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
-    print("DEBUG: querying for date =", yesterday.isoformat())
     # Find the question for yesterday
     yesterday_question = questions.find_one({"date": yesterday})
     client.close()
@@ -122,6 +79,44 @@ def get_yesterdays_question():
                        status=404, 
                        mimetype="application/json")
 
+@app.route('/day-before-yesterday/get-question/')
+def get_day_before_yesterdays_question():
+    print("DEBUG: day-before-yesterday endpoint called!")
+    try:
+        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
+        db = client[config["DB_NAME"]]
+        questions = db["questions"]
+        # get day before yesterday's date (2 days ago)
+        day_before_yesterday = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=2)
+
+        question = questions.find_one({"date": day_before_yesterday})
+        client.close()
+        
+        if question:
+            question["_id"] = str(question["_id"])
+            question["date"] = question["date"].strftime("%m-%d-%Y")
+            return Response(json.dumps(question), mimetype="application/json")
+        else:
+            return Response(json.dumps({"error": "No question found for day before yesterday"}), 
+                           status=404, 
+                           mimetype="application/json")
+    except Exception as e:
+        print(f"ERROR in day-before-yesterday endpoint: {e}")
+        return Response(json.dumps({"error": str(e)}), 
+                       status=500, 
+                       mimetype="application/json")
+    
+@app.route('/test-db')
+def test_db():
+    try:
+        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
+        db = client[config["DB_NAME"]]
+        collections = db.list_collection_names()
+        client.close()
+        return {"message": "Database connection successful", "collections": collections}
+    except Exception as e:
+        return {"error": f"Database connection failed: {str(e)}"}, 500
+    
 # Get user details by user_id
 @app.route('/user/<user_id>')
 def get_user(user_id):
@@ -729,223 +724,7 @@ def get_user_by_username(username: str):
             status=500,
             mimetype="application/json"
         )
-
-@app.route('/groups/create-group', methods=['POST'])
-def create_group():
-    try:
-        # Get group data from request body
-        group_data = request.json
-        
-        # Validate required fields
-        required_fields = ['group_name', 'password', 'username']
-        for field in required_fields:
-            if field not in group_data:
-                return Response(json.dumps({
-                    "error": f"Missing required field: {field}"
-                }), status=400, mimetype="application/json")
-        
-        # Connect to database
-        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
-        db = client[config["DB_NAME"]]
-        groups = db["groups"]
-        
-        # Check if group name already exists
-        existing_group = groups.find_one({"group_name": group_data['group_name']})
-        
-        if existing_group:
-            client.close()
-            return Response(json.dumps({
-                "error": "Group name already in use"
-            }), status=409, mimetype="application/json")
-        
-        # Hash the password
-        hashed_password = generate_password_hash(group_data['password'])
-        
-        # Prepare group document
-        new_group = {
-            "group_name": group_data['group_name'],
-            "password": hashed_password,
-            "members": [group_data['username']],  # Initialize with creator as first member
-        }
-        
-        # Insert new group
-        result = groups.insert_one(new_group)
-        group_id = str(result.inserted_id)
-        
-        # Close connection
-        client.close()
-        
-        return Response(json.dumps({
-            "message": "Group created successfully",
-            "group_id": group_id
-        }), status=201, mimetype="application/json")
-
-    except Exception as e:
-        return Response(json.dumps({
-            "error": str(e)
-        }), status=500, mimetype="application/json")
-
-@app.route('/groups/get-groups/<username>', methods=['GET'])
-def get_user_groups(username):
-    try:
-        # Connect to database
-        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
-        db = client[config["DB_NAME"]]
-        users = db["users"]
-        
-        # Find the user
-        user = users.find_one({"username": username})
-        
-        if not user:
-            client.close()
-            return Response(json.dumps({
-                "error": "User not found"
-            }), status=404, mimetype="application/json")
-        
-        # Get the user's groups list (default to empty list if not present)
-        user_groups = user.get("groups", [])
-        
-        client.close()
-        
-        return Response(json.dumps({
-            "groups": user_groups
-        }), mimetype="application/json")
-        
-    except Exception as e:
-        return Response(json.dumps({
-            "error": str(e)
-        }), status=500, mimetype="application/json")
-
-@app.route('/groups/join-group', methods=['POST'])
-def join_group():
-    try:
-        # Get join data from request body
-        join_data = request.json
-        
-        # Validate required fields
-        required_fields = ['group_name', 'password', 'username']
-        for field in required_fields:
-            if field not in join_data:
-                return Response(json.dumps({
-                    "error": f"Missing required field: {field}"
-                }), status=400, mimetype="application/json")
-        
-        # Connect to database
-        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
-        db = client[config["DB_NAME"]]
-        groups = db["groups"]
-        users = db["users"]
-        
-        # Find the group
-        group = groups.find_one({"group_name": join_data['group_name']})
-        
-        if not group:
-            client.close()
-            return Response(json.dumps({
-                "error": "Group not found"
-            }), status=404, mimetype="application/json")
-        
-        # Verify password
-        if not check_password_hash(group['password'], join_data['password']):
-            client.close()
-            return Response(json.dumps({
-                "error": "Incorrect password"
-            }), status=401, mimetype="application/json")
-        
-        # Check if user is already in the group
-        if join_data['username'] in group['members']:
-            client.close()
-            return Response(json.dumps({
-                "error": "User is already a member of this group"
-            }), status=409, mimetype="application/json")
-        
-        # Find the user
-        user = users.find_one({"username": join_data['username']})
-        if not user:
-            client.close()
-            return Response(json.dumps({
-                "error": "User not found"
-            }), status=404, mimetype="application/json")
-        
-        # Add user to group's members
-        groups.update_one(
-            {"group_name": join_data['group_name']},
-            {"$push": {"members": join_data['username']}}
-        )
-        
-        # Add group to user's groups
-        users.update_one(
-            {"username": join_data['username']},
-            {"$push": {"groups": join_data['group_name']}}
-        )
-        
-        client.close()
-        
-        return Response(json.dumps({
-            "message": "Successfully joined group"
-        }), mimetype="application/json")
-        
-    except Exception as e:
-        return Response(json.dumps({
-            "error": str(e)
-        }), status=500, mimetype="application/json")
-
-@app.route('/groups/leaderboard/<group_name>', methods=['GET'])
-def get_group_leaderboard(group_name):
-    try:
-        # Connect to database
-        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
-        db = client[config["DB_NAME"]]
-        groups = db["groups"]
-        users = db["users"]
-        
-        # Find the group
-        group = groups.find_one({"group_name": group_name})
-        if not group:
-            client.close()
-            return Response(json.dumps({
-                "error": "Group not found"
-            }), status=404, mimetype="application/json")
-        
-        # Get all users who are members of this group
-        group_members = group.get("members", [])
-        
-        # Get all users in the group with their details
-        user_cursor = users.find({"username": {"$in": group_members}})
-        
-        enriched = []
-        for user in user_cursor:
-            # Clean serialization of user data
-            clean_user = {
-                "_id": str(user["_id"]),
-                "username": user.get("username", ""),
-                "name": user.get("name", ""),
-                "avatar_url": user.get("avatar_url", ""),
-                "total_points": user.get("total_points", 0)
-            }
-            enriched.append(clean_user)
-        
-        client.close()
-        
-        # Sort by total_points descending
-        enriched.sort(key=lambda x: x["total_points"], reverse=True)
-        
-        # Add ranks
-        for index, user in enumerate(enriched):
-            user["rank"] = index + 1
-        
-        return Response(json.dumps({
-            "leaderboard": enriched,
-            "total_users": len(enriched),
-            "group_name": group_name
-        }), mimetype="application/json")
-        
-    except Exception as e:
-        return Response(json.dumps({
-            "error": str(e)
-        }), status=500, mimetype="application/json")
     
 if __name__ == '__main__':
     app.debug = True
     app.run()
-    
