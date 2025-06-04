@@ -782,6 +782,7 @@ def get_user_groups(username):
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         users = db["users"]
+        groups = db["groups"]
         
         # Find the user
         user = users.find_one({"username": username})
@@ -795,10 +796,20 @@ def get_user_groups(username):
         # Get the user's groups list (default to empty list if not present)
         user_groups = user.get("groups", [])
         
+        # Get group details including member count
+        group_details = []
+        for group_name in user_groups:
+            group = groups.find_one({"group_name": group_name})
+            if group:
+                group_details.append({
+                    "group_name": group_name,
+                    "group_size": group.get("group_size",0)
+                })
+        
         client.close()
         
         return Response(json.dumps({
-            "groups": user_groups
+            "groups": group_details
         }), mimetype="application/json")
         
     except Exception as e:
