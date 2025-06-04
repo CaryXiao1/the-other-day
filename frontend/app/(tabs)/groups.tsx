@@ -58,7 +58,10 @@ export default function GroupsScreen() {
   }, [username]);
 
   const handleGroupPress = (groupName: string) => {
-    console.log(`Pressed group: ${groupName}`);
+    router.push({
+      pathname: "/group-leaderboard",
+      params: { groupName }
+    });
   };
 
   if (loading) {

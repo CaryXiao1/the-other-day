@@ -986,6 +986,93 @@ def get_group_leaderboard(group_name):
         return Response(json.dumps({
             "error": str(e)
         }), status=500, mimetype="application/json")
+
+@app.route('/groups/<group_name>/answer-leaderboard/<question_id>', methods=['GET'])
+def get_group_answer_leaderboard(group_name, question_id):
+    try:
+        # Convert question_id to ObjectId
+        try:
+            object_id = ObjectId(question_id)
+        except Exception as e:
+            return Response(
+                json.dumps({"error": "Invalid question_id format"}),
+                status=400,
+                mimetype="application/json"
+            )
+
+        # Connect to MongoDB
+        client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
+        db = client[config["DB_NAME"]]
+        groups = db["groups"]
+        answers_col = db["answers"]
+        users_col = db["users"]
+
+        # Find the group and get its members
+        group = groups.find_one({"group_name": group_name})
+        if not group:
+            client.close()
+            return Response(json.dumps({
+                "error": "Group not found"
+            }), status=404, mimetype="application/json")
+        
+        group_members = group.get("members", [])
+
+        # Get all answers for this question
+        answer_cursor = answers_col.find({"question_id": object_id})
+
+        enriched = []
+        for ans in answer_cursor:
+            # Get the user who posted this answer
+            user_doc = users_col.find_one({"_id": ObjectId(ans["user_id"])})
+            
+            # Only include answers from group members
+            if user_doc and user_doc.get("username") in group_members:
+                # Compute votes / appearances ratio
+                votes = ans.get("votes", 0)
+                appearances = ans.get("appearances", 1)
+                appearances = max(appearances, 1)
+                ratio = votes / appearances
+
+                # Build a clean answer object
+                clean_ans = {
+                    "_id": str(ans["_id"]),
+                    "question_id": str(ans["question_id"]),
+                    "user_id": str(ans["user_id"]),
+                    "answer_text": ans.get("answer_text", ""),
+                    "votes": votes,
+                    "appearances": appearances
+                }
+
+                # Build a clean user object
+                clean_user = {
+                    "_id": str(user_doc["_id"]),
+                    "username": user_doc.get("username", ""),
+                    "name": user_doc.get("name", ""),
+                    "avatar_url": user_doc.get("avatar_url", "")
+                }
+
+                enriched.append({
+                    "answer": clean_ans,
+                    "user": clean_user,
+                    "ratio": ratio
+                })
+
+        client.close()
+
+        # Sort by ratio descending
+        enriched.sort(key=lambda x: x["ratio"], reverse=True)
+
+        # Drop the ratio before returning
+        result = [{"answer": item["answer"], "user": item["user"]} for item in enriched]
+
+        return Response(json.dumps(result), mimetype="application/json")
+
+    except Exception as e:
+        return Response(
+            json.dumps({"error": str(e)}),
+            status=500,
+            mimetype="application/json"
+        )
     
 if __name__ == '__main__':
     app.debug = True
