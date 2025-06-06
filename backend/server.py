@@ -798,6 +798,7 @@ def create_group():
         new_group = {
             "group_name": group_data['group_name'],
             "password": hashed_password,
+            "group_size": 1,
             "members": [group_data['username']],  # Initialize with creator as first member
         }
         

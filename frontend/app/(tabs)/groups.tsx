@@ -59,27 +59,28 @@ export default function GroupsScreen() {
     loadUser();
   }, []);
 
-  // ─── Fetch “My Groups” whenever username changes or after join/create ───
+  // ─── Fetch "My Groups" whenever username changes or after join/create ───
+  const fetchGroups = async () => {
+    if (!username) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await backendGet(`groups/get-groups/${username}`, {});
+      setGroups(data.groups || []);
+    } catch (e: any) {
+      setError(e instanceof Error ? e.message : "Error loading groups");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchGroups = async () => {
-      if (!username) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await backendGet(`groups/get-groups/${username}`, {});
-        setGroups(data.groups || []);
-      } catch (e: any) {
-        setError(e instanceof Error ? e.message : "Error loading groups");
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchGroups();
   }, [username]);
 
   // ─── Handlers ───
 
-  // Switch to “Create” mode
+  // Switch to "Create" mode
   const handleSwitchToCreate = () => {
     setMode("create");
     setFormError(null);
@@ -88,7 +89,7 @@ export default function GroupsScreen() {
     setFormPassword("");
   };
 
-  // Switch to “Join” mode
+  // Switch to "Join" mode
   const handleSwitchToJoin = () => {
     setMode("join");
     setFormError(null);
@@ -97,7 +98,7 @@ export default function GroupsScreen() {
     setFormPassword("");
   };
 
-  // Switch back to “List” mode
+  // Switch back to "List" mode
   const handleSwitchToList = () => {
     setMode("list");
     setFormError(null);
@@ -128,8 +129,7 @@ export default function GroupsScreen() {
         setMode("list");
         setFormGroupName("");
         setFormPassword("");
-        // Trigger fetch by resetting username state (or simply recall fetchGroups via effect)
-        setUsername((u) => u); // re‐use same username to re‐trigger effect
+        fetchGroups(); // Directly call fetchGroups instead of relying on username state
       }, 500);
     } catch (err: any) {
       console.error("Error creating group:", err);
@@ -168,7 +168,7 @@ export default function GroupsScreen() {
         setMode("list");
         setFormGroupName("");
         setFormPassword("");
-        setUsername((u) => u); // re‐trigger fetch
+        fetchGroups(); // Directly call fetchGroups instead of relying on username state
       }, 500);
     } catch (err: any) {
       console.error("Error joining group:", err);
@@ -222,17 +222,31 @@ export default function GroupsScreen() {
     );
   }
 
-  // ── “My Groups” list view ──
+  // ── "My Groups" list view ──
   if (mode === "list") {
     return (
       <View style={styles.container}>
         <Text style={[styles.title, { color: Colors[colorScheme ?? "light"].text }]}>
           Your Groups
         </Text>
+        <View style={styles.actionButtons}>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={handleSwitchToCreate}
+          >
+            <Text style={styles.actionButtonText}>Create Group</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={handleSwitchToJoin}
+          >
+            <Text style={styles.actionButtonText}>Join Group</Text>
+          </TouchableOpacity>
+        </View>
         <ScrollView style={styles.scrollView}>
           {groups.length === 0 ? (
             <Text style={[styles.text, { color: Colors[colorScheme ?? "light"].text }]}>
-              You’re not in any groups yet.
+              You're not in any groups yet.
             </Text>
           ) : (
             groups.map((g, idx) => (
@@ -251,20 +265,11 @@ export default function GroupsScreen() {
             ))
           )}
         </ScrollView>
-
-        <View style={styles.footerButtons}>
-          <TouchableOpacity style={styles.footerButton} onPress={handleSwitchToCreate}>
-            <Text style={styles.footerButtonText}>+ Create Group</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.footerButton} onPress={handleSwitchToJoin}>
-            <Text style={styles.footerButtonText}>⇨ Join Group</Text>
-          </TouchableOpacity>
-        </View>
       </View>
     );
   }
 
-  // ── “Create Group” form ──
+  // ── "Create Group" form ──
   if (mode === "create") {
     return (
       <KeyboardAvoidingView
@@ -322,7 +327,7 @@ export default function GroupsScreen() {
     );
   }
 
-  // ── “Join Group” form ──
+  // ── "Join Group" form ──
   if (mode === "join") {
     return (
       <KeyboardAvoidingView
@@ -389,6 +394,63 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 60,
     backgroundColor: "#f9f9f9",
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    gap: 10,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  header: {
+    marginBottom: 20,
+  },
+  modeButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  activeModeButton: {
+    backgroundColor: '#007AFF',
+  },
+  modeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  activeModeButtonText: {
+    color: '#fff',
   },
   centeredContainer: {
     flex: 1,
@@ -495,5 +557,18 @@ const styles = StyleSheet.create({
   },
   linkButtonText: {
     fontSize: 16,
+  },
+  button: {
+    backgroundColor: "#007AFF",
+    padding: 15,
+    borderRadius: 8,
+    marginVertical: 10,
+    width: "80%",
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
