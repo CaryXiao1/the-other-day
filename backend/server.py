@@ -775,10 +775,12 @@ def create_group():
                     "error": f"Missing required field: {field}"
                 }), status=400, mimetype="application/json")
         
+
         # Connect to database
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         groups = db["groups"]
+        users = db["users"]
         
         # Check if group name already exists
         existing_group = groups.find_one({"group_name": group_data['group_name']})
@@ -791,19 +793,24 @@ def create_group():
         
         # Hash the password
         hashed_password = generate_password_hash(group_data['password'])
-        
+
         # Prepare group document
         new_group = {
             "group_name": group_data['group_name'],
             "password": hashed_password,
+            "group_size": 1,
             "members": [group_data['username']],  # Initialize with creator as first member
         }
         
         # Insert new group
         result = groups.insert_one(new_group)
         group_id = str(result.inserted_id)
-        
-        # Close connection
+
+        users.update_one(
+            {"username": group_data['username']},
+            {"$push": {"groups": group_data['group_name']}}
+        )
+
         client.close()
         
         return Response(json.dumps({
@@ -842,9 +849,10 @@ def get_user_groups(username):
         for group_name in user_groups:
             group = groups.find_one({"group_name": group_name})
             if group:
+                members = group.get("members", [])
                 group_details.append({
                     "group_name": group_name,
-                    "group_size": group.get("group_size",0)
+                    "group_size": len(members)
                 })
         
         client.close()
