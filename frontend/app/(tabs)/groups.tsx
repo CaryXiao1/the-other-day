@@ -1,20 +1,21 @@
 import React, { useEffect, useState } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
   TextInput,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  SafeAreaView,
 } from "react-native";
-import { useColorScheme } from "@/hooks/useColorScheme";
-import { Colors } from "@/constants/Colors";
+import { ThemedText } from "@/components/ThemedText";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { backendGet, api } from "@/backendAPI/backend"; // assumes you've exported `api`
+import { backendGet, api } from "@/backendAPI/backend";
 import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 
 type Group = {
   group_name: string;
@@ -22,25 +23,19 @@ type Group = {
 };
 
 export default function GroupsScreen() {
-  // ─── State ───
   const [username, setUsername] = useState<string>("");
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Which sub‐view? "list", "create", or "join"
   const [mode, setMode] = useState<"list" | "create" | "join">("list");
 
-  // Form fields for create/join
   const [formGroupName, setFormGroupName] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
-  const colorScheme = useColorScheme();
-
-  // ─── Load current username from AsyncStorage ───
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -48,7 +43,6 @@ export default function GroupsScreen() {
         if (stored) {
           setUsername(stored);
         } else {
-          // If no username, send them to login
           router.replace("/login");
         }
       } catch (e) {
@@ -59,7 +53,6 @@ export default function GroupsScreen() {
     loadUser();
   }, []);
 
-  // ─── Fetch "My Groups" whenever username changes or after join/create ───
   const fetchGroups = async () => {
     if (!username) return;
     setLoading(true);
@@ -78,9 +71,6 @@ export default function GroupsScreen() {
     fetchGroups();
   }, [username]);
 
-  // ─── Handlers ───
-
-  // Switch to "Create" mode
   const handleSwitchToCreate = () => {
     setMode("create");
     setFormError(null);
@@ -89,7 +79,6 @@ export default function GroupsScreen() {
     setFormPassword("");
   };
 
-  // Switch to "Join" mode
   const handleSwitchToJoin = () => {
     setMode("join");
     setFormError(null);
@@ -98,14 +87,12 @@ export default function GroupsScreen() {
     setFormPassword("");
   };
 
-  // Switch back to "List" mode
   const handleSwitchToList = () => {
     setMode("list");
     setFormError(null);
     setFormSuccess(null);
   };
 
-  // Create a new group
   const handleCreateGroup = async () => {
     if (!formGroupName.trim() || !formPassword) {
       setFormError("Both group name and password are required.");
@@ -122,19 +109,19 @@ export default function GroupsScreen() {
         username: username,
       };
       const resp = await api.post("/groups/create-group", payload);
-      // On success:
       setFormSuccess("Group created successfully!");
-      // Refresh list after a short delay so backend has updated:
       setTimeout(() => {
         setMode("list");
         setFormGroupName("");
         setFormPassword("");
-        fetchGroups(); // Directly call fetchGroups instead of relying on username state
+        fetchGroups();
       }, 500);
     } catch (err: any) {
       console.error("Error creating group:", err);
       if (err.response) {
-        setFormError(err.response.data.error || `Error: ${err.response.status}`);
+        setFormError(
+          err.response.data.error || `Error: ${err.response.status}`
+        );
       } else if (err.request) {
         setFormError("Server not responding. Try again later.");
       } else {
@@ -145,7 +132,6 @@ export default function GroupsScreen() {
     }
   };
 
-  // Join an existing group
   const handleJoinGroup = async () => {
     if (!formGroupName.trim() || !formPassword) {
       setFormError("Both group name and password are required.");
@@ -162,18 +148,19 @@ export default function GroupsScreen() {
         username: username,
       };
       const resp = await api.post("/groups/join-group", payload);
-      // On success:
       setFormSuccess("Successfully joined group!");
       setTimeout(() => {
         setMode("list");
         setFormGroupName("");
         setFormPassword("");
-        fetchGroups(); // Directly call fetchGroups instead of relying on username state
+        fetchGroups();
       }, 500);
     } catch (err: any) {
       console.error("Error joining group:", err);
       if (err.response) {
-        setFormError(err.response.data.error || `Error: ${err.response.status}`);
+        setFormError(
+          err.response.data.error || `Error: ${err.response.status}`
+        );
       } else if (err.request) {
         setFormError("Server not responding. Try again later.");
       } else {
@@ -184,7 +171,6 @@ export default function GroupsScreen() {
     }
   };
 
-  // Navigate to group leaderboard
   const handleGroupPress = (groupName: string) => {
     router.push({
       pathname: "/group-leaderboard",
@@ -192,196 +178,361 @@ export default function GroupsScreen() {
     });
   };
 
-  // ─── Render ───
-  // If still loading the list
-  if (loading && mode === "list") {
+  if (!username) {
     return (
-      <View style={styles.centeredContainer}>
-        <ActivityIndicator size="large" />
-        <Text style={[styles.text, { color: Colors[colorScheme ?? "light"].text }]}>
-          Loading groups...
-        </Text>
-      </View>
+      <LinearGradient
+        colors={["#0F0F23", "#1A1A3E", "#2D1B69"]}
+        style={styles.container}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#8B5CF6" />
+          <ThemedText style={styles.loadingText}>Initializing...</ThemedText>
+        </View>
+      </LinearGradient>
     );
   }
 
-  // If error loading list
-  if (error && mode === "list") {
-    return (
-      <View style={styles.centeredContainer}>
-        <Text style={[styles.text, { color: Colors[colorScheme ?? "light"].text }]}>
-          Error: {error}
-        </Text>
-        <TouchableOpacity style={styles.button} onPress={handleSwitchToCreate}>
-          <Text style={styles.buttonText}>Create a New Group</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={handleSwitchToJoin}>
-          <Text style={styles.buttonText}>Join a Group</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // ── "My Groups" list view ──
   if (mode === "list") {
     return (
-      <View style={styles.container}>
-        <Text style={[styles.title, { color: Colors[colorScheme ?? "light"].text }]}>
-          Your Groups
-        </Text>
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={styles.actionButton} 
-            onPress={handleSwitchToCreate}
+      <LinearGradient
+        colors={["#0F0F23", "#1A1A3E", "#2D1B69"]}
+        style={styles.container}
+      >
+        <SafeAreaView style={{ flex: 1 }}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.actionButtonText}>Create Group</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.actionButton} 
-            onPress={handleSwitchToJoin}
-          >
-            <Text style={styles.actionButtonText}>Join Group</Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView style={styles.scrollView}>
-          {groups.length === 0 ? (
-            <Text style={[styles.text, { color: Colors[colorScheme ?? "light"].text }]}>
-              You're not in any groups yet.
-            </Text>
-          ) : (
-            groups.map((g, idx) => (
+            <View style={styles.headerContainer}>
+              <ThemedText style={styles.greeting}>Your Groups</ThemedText>
+              <ThemedText style={styles.username}>{username}</ThemedText>
+              <View style={styles.headerDivider} />
+            </View>
+
+            <View style={styles.actionButtonsContainer}>
               <TouchableOpacity
-                key={`${g.group_name}-${idx}`}
-                style={[styles.groupButton, { backgroundColor: Colors[colorScheme ?? "light"].background }]}
-                onPress={() => handleGroupPress(g.group_name)}
+                style={styles.actionButton}
+                onPress={handleSwitchToCreate}
               >
-                <Text style={[styles.groupName, { color: Colors[colorScheme ?? "light"].text }]}>
-                  {g.group_name}
-                </Text>
-                <Text style={[styles.groupSize, { color: Colors[colorScheme ?? "light"].text }]}>
-                  {g.group_size} member{g.group_size === 1 ? "" : "s"}
-                </Text>
+                <BlurView intensity={20} style={styles.actionButtonBlur}>
+                  <LinearGradient
+                    colors={[
+                      "rgba(139, 92, 246, 0.2)",
+                      "rgba(139, 92, 246, 0.1)",
+                    ]}
+                    style={styles.actionButtonGradient}
+                  >
+                    <ThemedText style={styles.actionButtonText}>
+                      Create Group
+                    </ThemedText>
+                    <ThemedText style={styles.actionButtonIcon}>+</ThemedText>
+                  </LinearGradient>
+                </BlurView>
               </TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
-      </View>
+
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleSwitchToJoin}
+              >
+                <BlurView intensity={20} style={styles.actionButtonBlur}>
+                  <LinearGradient
+                    colors={[
+                      "rgba(34, 197, 94, 0.2)",
+                      "rgba(34, 197, 94, 0.1)",
+                    ]}
+                    style={styles.actionButtonGradient}
+                  >
+                    <ThemedText style={styles.actionButtonText}>
+                      Join Group
+                    </ThemedText>
+                    <ThemedText style={styles.actionButtonIcon}>→</ThemedText>
+                  </LinearGradient>
+                </BlurView>
+              </TouchableOpacity>
+            </View>
+
+            <BlurView intensity={20} style={styles.glassCard}>
+              <LinearGradient
+                colors={["rgba(59, 130, 246, 0.1)", "rgba(59, 130, 246, 0.05)"]}
+                style={styles.cardGradient}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={styles.groupsBadge}>
+                    <ThemedText style={styles.badgeText}>MY GROUPS</ThemedText>
+                  </View>
+                </View>
+
+                {loading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator color="#3B82F6" />
+                    <ThemedText style={styles.loadingQuestionText}>
+                      Loading groups...
+                    </ThemedText>
+                  </View>
+                ) : error ? (
+                  <View style={styles.errorContainer}>
+                    <ThemedText style={styles.errorText}>{error}</ThemedText>
+                  </View>
+                ) : groups.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <ThemedText style={styles.emptyText}>
+                      You're not in any groups yet
+                    </ThemedText>
+                    <ThemedText style={styles.emptySubtext}>
+                      Create or join a group to get started
+                    </ThemedText>
+                  </View>
+                ) : (
+                  <View style={styles.groupsList}>
+                    {groups.map((group, idx) => (
+                      <TouchableOpacity
+                        key={`${group.group_name}-${idx}`}
+                        style={styles.groupItem}
+                        onPress={() => handleGroupPress(group.group_name)}
+                      >
+                        <BlurView intensity={10} style={styles.groupBlur}>
+                          <View style={styles.groupContent}>
+                            <View style={styles.groupInfo}>
+                              <ThemedText style={styles.groupName}>
+                                {group.group_name}
+                              </ThemedText>
+                              <ThemedText style={styles.groupSize}>
+                                {group.group_size} member
+                                {group.group_size === 1 ? "" : "s"}
+                              </ThemedText>
+                            </View>
+                            <View style={styles.groupArrow}>
+                              <ThemedText style={styles.groupArrowText}>
+                                →
+                              </ThemedText>
+                            </View>
+                          </View>
+                        </BlurView>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </LinearGradient>
+            </BlurView>
+
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </SafeAreaView>
+      </LinearGradient>
     );
   }
 
-  // ── "Create Group" form ──
   if (mode === "create") {
     return (
-      <KeyboardAvoidingView
+      <LinearGradient
+        colors={["#0F0F23", "#1A1A3E", "#2D1B69"]}
         style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <Text style={[styles.title, { color: Colors[colorScheme ?? "light"].text }]}>
-          Create a New Group
-        </Text>
-
-        <View style={styles.form}>
-          <TextInput
-            style={[styles.input, { color: Colors[colorScheme ?? "light"].text }]}
-            placeholder="Group Name"
-            placeholderTextColor="#666"
-            value={formGroupName}
-            onChangeText={setFormGroupName}
-            autoCapitalize="none"
-          />
-          <TextInput
-            style={[styles.input, { color: Colors[colorScheme ?? "light"].text }]}
-            placeholder="Password"
-            placeholderTextColor="#666"
-            secureTextEntry
-            value={formPassword}
-            onChangeText={setFormPassword}
-          />
-
-          {formError ? (
-            <Text style={styles.formError}>{formError}</Text>
-          ) : null}
-          {formSuccess ? (
-            <Text style={styles.formSuccess}>{formSuccess}</Text>
-          ) : null}
-
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleCreateGroup}
-            disabled={formLoading}
+        <SafeAreaView style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            style={styles.formContainer}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
           >
-            {formLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitButtonText}>Create Group</Text>
-            )}
-          </TouchableOpacity>
+            <ScrollView
+              contentContainerStyle={styles.scrollContainer}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.headerContainer}>
+                <ThemedText style={styles.greeting}>Create Group</ThemedText>
+                <ThemedText style={styles.username}>New Community</ThemedText>
+                <View style={styles.headerDivider} />
+              </View>
 
-          <TouchableOpacity style={styles.linkButton} onPress={handleSwitchToList}>
-            <Text style={[styles.linkButtonText, { color: Colors[colorScheme ?? "light"].text }]}>
-              ← Back to My Groups
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+              <BlurView intensity={20} style={styles.glassCard}>
+                <LinearGradient
+                  colors={[
+                    "rgba(139, 92, 246, 0.1)",
+                    "rgba(139, 92, 246, 0.05)",
+                  ]}
+                  style={styles.cardGradient}
+                >
+                  <View style={styles.cardHeader}>
+                    <View style={styles.createBadge}>
+                      <ThemedText style={styles.badgeText}>CREATE</ThemedText>
+                    </View>
+                  </View>
+
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.modernInput}
+                      placeholder="Group Name"
+                      placeholderTextColor="rgba(255,255,255,0.5)"
+                      value={formGroupName}
+                      onChangeText={setFormGroupName}
+                      autoCapitalize="none"
+                    />
+
+                    <TextInput
+                      style={styles.modernInput}
+                      placeholder="Password"
+                      placeholderTextColor="rgba(255,255,255,0.5)"
+                      secureTextEntry
+                      value={formPassword}
+                      onChangeText={setFormPassword}
+                    />
+
+                    {formError && (
+                      <View style={styles.errorContainer}>
+                        <ThemedText style={styles.errorText}>
+                          {formError}
+                        </ThemedText>
+                      </View>
+                    )}
+
+                    {formSuccess && (
+                      <View style={styles.successContainer}>
+                        <ThemedText style={styles.successText}>
+                          {formSuccess}
+                        </ThemedText>
+                      </View>
+                    )}
+
+                    <TouchableOpacity
+                      style={[
+                        styles.submitButton,
+                        formLoading && styles.submitButtonDisabled,
+                      ]}
+                      onPress={handleCreateGroup}
+                      disabled={formLoading}
+                    >
+                      {formLoading ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <>
+                          <ThemedText style={styles.submitButtonText}>
+                            Create Group
+                          </ThemedText>
+                          <ThemedText style={styles.submitArrow}>+</ThemedText>
+                        </>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.backButton}
+                      onPress={handleSwitchToList}
+                    >
+                      <ThemedText style={styles.backButtonText}>
+                        ← Back to Groups
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                </LinearGradient>
+              </BlurView>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </LinearGradient>
     );
   }
 
-  // ── "Join Group" form ──
   if (mode === "join") {
     return (
-      <KeyboardAvoidingView
+      <LinearGradient
+        colors={["#0F0F23", "#1A1A3E", "#2D1B69"]}
         style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <Text style={[styles.title, { color: Colors[colorScheme ?? "light"].text }]}>
-          Join a Group
-        </Text>
-
-        <View style={styles.form}>
-          <TextInput
-            style={[styles.input, { color: Colors[colorScheme ?? "light"].text }]}
-            placeholder="Group Name"
-            placeholderTextColor="#666"
-            value={formGroupName}
-            onChangeText={setFormGroupName}
-            autoCapitalize="none"
-          />
-          <TextInput
-            style={[styles.input, { color: Colors[colorScheme ?? "light"].text }]}
-            placeholder="Password"
-            placeholderTextColor="#666"
-            secureTextEntry
-            value={formPassword}
-            onChangeText={setFormPassword}
-          />
-
-          {formError ? (
-            <Text style={styles.formError}>{formError}</Text>
-          ) : null}
-          {formSuccess ? (
-            <Text style={styles.formSuccess}>{formSuccess}</Text>
-          ) : null}
-
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleJoinGroup}
-            disabled={formLoading}
+        <SafeAreaView style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            style={styles.formContainer}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
           >
-            {formLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitButtonText}>Join Group</Text>
-            )}
-          </TouchableOpacity>
+            <ScrollView
+              contentContainerStyle={styles.scrollContainer}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.headerContainer}>
+                <ThemedText style={styles.greeting}>Join Group</ThemedText>
+                <ThemedText style={styles.username}>Find Community</ThemedText>
+                <View style={styles.headerDivider} />
+              </View>
 
-          <TouchableOpacity style={styles.linkButton} onPress={handleSwitchToList}>
-            <Text style={[styles.linkButtonText, { color: Colors[colorScheme ?? "light"].text }]}>
-              ← Back to My Groups
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+              <BlurView intensity={20} style={styles.glassCard}>
+                <LinearGradient
+                  colors={["rgba(34, 197, 94, 0.1)", "rgba(34, 197, 94, 0.05)"]}
+                  style={styles.cardGradient}
+                >
+                  <View style={styles.cardHeader}>
+                    <View style={styles.joinBadge}>
+                      <ThemedText style={styles.badgeText}>JOIN</ThemedText>
+                    </View>
+                  </View>
+
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.modernInput}
+                      placeholder="Group Name"
+                      placeholderTextColor="rgba(255,255,255,0.5)"
+                      value={formGroupName}
+                      onChangeText={setFormGroupName}
+                      autoCapitalize="none"
+                    />
+
+                    <TextInput
+                      style={styles.modernInput}
+                      placeholder="Password"
+                      placeholderTextColor="rgba(255,255,255,0.5)"
+                      secureTextEntry
+                      value={formPassword}
+                      onChangeText={setFormPassword}
+                    />
+
+                    {formError && (
+                      <View style={styles.errorContainer}>
+                        <ThemedText style={styles.errorText}>
+                          {formError}
+                        </ThemedText>
+                      </View>
+                    )}
+
+                    {formSuccess && (
+                      <View style={styles.successContainer}>
+                        <ThemedText style={styles.successText}>
+                          {formSuccess}
+                        </ThemedText>
+                      </View>
+                    )}
+
+                    <TouchableOpacity
+                      style={[
+                        styles.submitButton,
+                        formLoading && styles.submitButtonDisabled,
+                        { backgroundColor: "rgba(34, 197, 94, 0.8)" },
+                      ]}
+                      onPress={handleJoinGroup}
+                      disabled={formLoading}
+                    >
+                      {formLoading ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <>
+                          <ThemedText style={styles.submitButtonText}>
+                            Join Group
+                          </ThemedText>
+                          <ThemedText style={styles.submitArrow}>→</ThemedText>
+                        </>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.backButton}
+                      onPress={handleSwitchToList}
+                    >
+                      <ThemedText style={styles.backButtonText}>
+                        ← Back to Groups
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                </LinearGradient>
+              </BlurView>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </LinearGradient>
     );
   }
 
@@ -391,184 +542,264 @@ export default function GroupsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: "#f9f9f9",
   },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-    gap: 10,
+  scrollContainer: {
+    padding: 20,
+    paddingTop: 40,
+  },
+  formContainer: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "300",
+  },
+  loadingQuestionText: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 16,
+    marginTop: 12,
+  },
+
+  headerContainer: {
+    alignItems: "center",
+    marginBottom: 40,
+  },
+  greeting: {
+    fontSize: 16,
+    color: "rgba(255,255,255,0.6)",
+    fontWeight: "300",
+    letterSpacing: 0.5,
+  },
+  username: {
+    fontSize: 32,
+    color: "#fff",
+    fontWeight: "700",
+    marginTop: 5,
+    letterSpacing: -0.5,
+    lineHeight: 35,
+  },
+  headerDivider: {
+    width: 60,
+    height: 2,
+    backgroundColor: "#8B5CF6",
+    marginTop: 16,
+    borderRadius: 1,
+  },
+
+  actionButtonsContainer: {
+    flexDirection: "row",
+    gap: 16,
+    marginBottom: 24,
   },
   actionButton: {
     flex: 1,
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  actionButtonBlur: {
+    padding: 20,
+  },
+  actionButtonGradient: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   actionButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
-  header: {
-    marginBottom: 20,
+  actionButtonIcon: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "300",
   },
-  modeButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+
+  glassCard: {
+    borderRadius: 24,
+    marginBottom: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
   },
-  modeButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    alignItems: 'center',
+  cardGradient: {
+    padding: 24,
   },
-  activeModeButton: {
-    backgroundColor: '#007AFF',
-  },
-  modeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-  },
-  activeModeButtonText: {
-    color: '#fff',
-  },
-  centeredContainer: {
-    flex: 1,
-    justifyContent: "center",
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 20,
+  },
+  groupsBadge: {
+    backgroundColor: "rgba(59, 130, 246, 0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(59, 130, 246, 0.3)",
+  },
+  createBadge: {
+    backgroundColor: "rgba(139, 92, 246, 0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.3)",
+  },
+  joinBadge: {
+    backgroundColor: "rgba(34, 197, 94, 0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(34, 197, 94, 0.3)",
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#fff",
+    letterSpacing: 1,
+  },
+
+  groupsList: {
+    gap: 16,
+  },
+  groupItem: {
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  groupBlur: {
     padding: 20,
-    backgroundColor: "#f9f9f9",
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-    textAlign: "center",
+  groupContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  text: {
-    fontSize: 16,
-    textAlign: "center",
-  },
-  scrollView: {
+  groupInfo: {
     flex: 1,
-    marginBottom: 20,
-  },
-  groupButton: {
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   groupName: {
     fontSize: 18,
+    color: "#fff",
     fontWeight: "600",
-    marginBottom: 5,
+    marginBottom: 4,
   },
   groupSize: {
     fontSize: 14,
-    opacity: 0.7,
+    color: "rgba(255,255,255,0.6)",
   },
-
-  footerButtons: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderColor: "#ddd",
-    backgroundColor: "#fff",
-  },
-  footerButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    backgroundColor: "#007AFF",
-    borderRadius: 8,
-  },
-  footerButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-
-  form: {
-    marginTop: 10,
-  },
-  input: {
-    height: 50,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    fontSize: 16,
-    marginBottom: 15,
-    backgroundColor: "#fff",
-  },
-  submitButton: {
-    backgroundColor: "#007AFF",
-    height: 50,
-    borderRadius: 8,
+  groupArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.1)",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 15,
+  },
+  groupArrowText: {
+    color: "#fff",
+    fontSize: 16,
+  },
+
+  emptyContainer: {
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "500",
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.5)",
+    textAlign: "center",
+  },
+
+  inputContainer: {
+    gap: 16,
+  },
+  modernInput: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 16,
+    padding: 16,
+    fontSize: 16,
+    color: "#fff",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+
+  submitButton: {
+    backgroundColor: "rgba(139, 92, 246, 0.8)",
+    borderRadius: 16,
+    height: 56,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.3)",
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   submitButtonText: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "600",
   },
-  formError: {
-    color: "#FF3B30",
-    fontSize: 14,
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  formSuccess: {
-    color: "#34C759",
-    fontSize: 14,
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  linkButton: {
-    marginTop: 10,
-    alignSelf: "center",
-  },
-  linkButtonText: {
-    fontSize: 16,
-  },
-  button: {
-    backgroundColor: "#007AFF",
-    padding: 15,
-    borderRadius: 8,
-    marginVertical: 10,
-    width: "80%",
-    alignItems: "center",
-  },
-  buttonText: {
+  submitArrow: {
     color: "#fff",
+    fontSize: 18,
+    fontWeight: "300",
+  },
+  backButton: {
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  backButtonText: {
+    color: "rgba(255,255,255,0.7)",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "500",
+  },
+
+  errorContainer: {
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.2)",
+  },
+  errorText: {
+    color: "#EF4444",
+    fontSize: 14,
+    textAlign: "center",
+  },
+  successContainer: {
+    backgroundColor: "rgba(34, 197, 94, 0.1)",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(34, 197, 94, 0.2)",
+  },
+  successText: {
+    color: "#22C55E",
+    fontSize: 14,
+    textAlign: "center",
   },
 });

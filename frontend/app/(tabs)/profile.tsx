@@ -3,37 +3,41 @@ import {
   StyleSheet,
   View,
   Image,
-  FlatList,
-  Text,
   TouchableOpacity,
   SafeAreaView,
   Modal,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
 import { backendGet } from "@/backendAPI/backend";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 
 const handleLogout = async () => {
   await AsyncStorage.removeItem("user_id");
   router.replace("/login");
 };
 
-// Loading Component
 const LoadingScreen = () => (
-  <ThemedView style={styles.loadingContainer}>
-    <View style={styles.loadingContent}>
-      <ActivityIndicator size="large" color="#007AFF" />
-      <ThemedText style={styles.loadingText}>Loading...</ThemedText>
+  <LinearGradient
+    colors={["#0F0F23", "#1A1A3E", "#2D1B69"]}
+    style={styles.container}
+  >
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="#8B5CF6" />
+      <ThemedText style={styles.loadingText}>
+        Loading your profile...
+      </ThemedText>
       <View style={styles.loadingPlaceholders}>
         <View style={styles.avatarLoadingPlaceholder} />
         <View style={styles.textLoadingPlaceholder} />
         <View style={[styles.textLoadingPlaceholder, { width: 100 }]} />
       </View>
     </View>
-  </ThemedView>
+  </LinearGradient>
 );
 
 export default function ProfileScreen() {
@@ -93,218 +97,362 @@ export default function ProfileScreen() {
     fetchProfileData();
   }, [userId]);
 
-  // Show loading screen while fetching data OR while userId is being loaded
   if (loading || (userId && !userData)) {
     return <LoadingScreen />;
   }
 
   if (!userId) {
     return (
-      <ThemedView style={styles.container}>
-        <ThemedText>Please log in to view your profile.</ThemedText>
-        <TouchableOpacity onPress={() => router.replace("/login")}>
-          <Text>Go to Login</Text>
-        </TouchableOpacity>
-      </ThemedView>
+      <LinearGradient
+        colors={["#0F0F23", "#1A1A3E", "#2D1B69"]}
+        style={styles.container}
+      >
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={styles.errorContainer}>
+            <BlurView intensity={20} style={styles.glassCard}>
+              <LinearGradient
+                colors={["rgba(239, 68, 68, 0.1)", "rgba(220, 38, 38, 0.05)"]}
+                style={styles.cardGradient}
+              >
+                <ThemedText style={styles.errorTitle}>
+                  Authentication Required
+                </ThemedText>
+                <ThemedText style={styles.errorText}>
+                  Please log in to view your profile.
+                </ThemedText>
+                <TouchableOpacity
+                  onPress={() => router.replace("/login")}
+                  style={styles.loginButton}
+                >
+                  <ThemedText style={styles.loginButtonText}>
+                    Go to Login
+                  </ThemedText>
+                  <ThemedText style={styles.buttonArrow}>→</ThemedText>
+                </TouchableOpacity>
+              </LinearGradient>
+            </BlurView>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <ThemedView style={styles.container}>
-        {userData ? (
-          <>
-            <View style={styles.header}>
-              {userData.avatar_url ? (
-                <Image
-                  source={{ uri: userData.avatar_url }}
-                  style={styles.avatar}
-                />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <ThemedText style={styles.avatarPlaceholderText}>
-                    {(userData.name || userData.username)
-                      ?.charAt(0)
-                      .toUpperCase() || "?"}
-                  </ThemedText>
-                </View>
-              )}
-              <ThemedText style={styles.username}>
-                {userData.name || userData.username || "Unknown User"}
-              </ThemedText>
-              {userData.total_points !== undefined && (
-                <ThemedText style={styles.points}>
-                  {userData.total_points} points
-                </ThemedText>
-              )}
-            </View>
+    <LinearGradient
+      colors={["#0F0F23", "#1A1A3E", "#2D1B69"]}
+      style={styles.container}
+    >
+      <SafeAreaView style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {userData ? (
+            <>
+              <BlurView intensity={20} style={styles.glassCard}>
+                <LinearGradient
+                  colors={[
+                    "rgba(139, 92, 246, 0.1)",
+                    "rgba(59, 130, 246, 0.05)",
+                  ]}
+                  style={styles.cardGradient}
+                >
+                  <View style={styles.profileHeader}>
+                    {userData.avatar_url ? (
+                      <Image
+                        source={{ uri: userData.avatar_url }}
+                        style={styles.avatar}
+                      />
+                    ) : (
+                      <View style={styles.avatarPlaceholder}>
+                        <ThemedText style={styles.avatarPlaceholderText}>
+                          {(userData.name || userData.username)
+                            ?.charAt(0)
+                            .toUpperCase() || "?"}
+                        </ThemedText>
+                      </View>
+                    )}
 
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
-              Top Answers
-            </ThemedText>
-            {topAnswers && topAnswers.length > 0 ? (
-              <FlatList
-                style={{ flexGrow: 0 }}
-                data={topAnswers.slice(0, 2)}
-                keyExtractor={(item) => item._id}
-                renderItem={({ item }) => (
-                  <View style={styles.answerItem}>
-                    <ThemedText style={styles.questionText}>
-                      {item.question_text} ({item.date})
-                    </ThemedText>
-                    <ThemedText style={styles.answerText}>
-                      Answer: {item.answer_text}
-                    </ThemedText>
-                    <ThemedText style={styles.votesText}>
-                      Votes: {item.votes || 0}
-                    </ThemedText>
-                  </View>
-                )}
-                ListEmptyComponent={<ThemedText>No answers yet</ThemedText>}
-              />
-            ) : (
-              <ThemedText>No answers yet</ThemedText>
-            )}
-
-            <TouchableOpacity
-              onPress={() => setShowLeaderboard(true)}
-              style={styles.leaderboardButton}
-            >
-              <Text style={styles.leaderboardButtonText}>
-                View Global Leaderboard
-              </Text>
-            </TouchableOpacity>
-
-            <Modal
-              animationType="slide"
-              transparent={false}
-              visible={showLeaderboard}
-              onRequestClose={() => setShowLeaderboard(false)}
-            >
-              <SafeAreaView style={styles.modalContainer}>
-                <ThemedText style={styles.modalTitle}>
-                  Global Leaderboard
-                </ThemedText>
-                {ranking && (
-                  <ThemedText style={styles.rankingText}>
-                    Your Rank: {ranking.rank} out of {ranking.total_users} users
-                  </ThemedText>
-                )}
-                <FlatList
-                  data={leaderboard}
-                  keyExtractor={(item) => item.user_id}
-                  renderItem={({ item }) => {
-                    const isCurrentUser = item.user_id === userId;
-                    return (
-                      <View
-                        style={[
-                          styles.leaderboardItem,
-                          isCurrentUser && styles.currentUserItem,
-                        ]}
-                      >
-                        <View style={styles.rankContainer}>
-                          <ThemedText
-                            style={[
-                              styles.rankNumber,
-                              isCurrentUser && styles.currentUserText,
-                            ]}
-                          >
-                            #{item.rank}
+                    <View style={styles.profileInfo}>
+                      <ThemedText style={styles.username}>
+                        {userData.name || userData.username || "Unknown User"}
+                      </ThemedText>
+                      {userData.total_points !== undefined && (
+                        <View style={styles.pointsBadge}>
+                          <ThemedText style={styles.pointsText}>
+                            {userData.total_points} points
                           </ThemedText>
                         </View>
-                        <View style={styles.userInfoContainer}>
-                          {item.avatar_url ? (
-                            <Image
-                              source={{ uri: item.avatar_url }}
-                              style={styles.leaderboardAvatar}
-                            />
-                          ) : (
-                            <View
-                              style={[
-                                styles.leaderboardAvatarPlaceholder,
-                                isCurrentUser && styles.currentUserAvatar,
-                              ]}
-                            >
-                              <ThemedText style={styles.leaderboardAvatarText}>
-                                {(item.name || item.username)
-                                  ?.charAt(0)
-                                  .toUpperCase() || "?"}
-                              </ThemedText>
-                            </View>
-                          )}
-                          <View style={styles.userDetails}>
-                            <ThemedText
-                              style={[
-                                styles.leaderboardUsername,
-                                isCurrentUser && styles.currentUserText,
-                              ]}
-                            >
-                              {item.name || item.username}
-                              {isCurrentUser && " (You)"}
-                            </ThemedText>
-                            <ThemedText
-                              style={[
-                                styles.leaderboardPoints,
-                                isCurrentUser && styles.currentUserText,
-                              ]}
-                            >
-                              {item.total_points} points
-                            </ThemedText>
-                          </View>
-                        </View>
-                      </View>
-                    );
-                  }}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowLeaderboard(false)}
-                  style={styles.closeButton}
-                >
-                  <Text style={styles.closeButtonText}>Close</Text>
-                </TouchableOpacity>
-              </SafeAreaView>
-            </Modal>
+                      )}
+                    </View>
+                  </View>
+                </LinearGradient>
+              </BlurView>
 
-            <TouchableOpacity
-              onPress={handleLogout}
-              style={styles.logoutButton}
-            >
-              <Text style={styles.logoutText}>Log Out</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <View style={styles.errorContainer}>
-            <ThemedText>Unable to load profile data</ThemedText>
-            <TouchableOpacity
-              onPress={() => router.replace("/login")}
-              style={styles.loginButton}
-            >
-              <Text style={styles.loginButtonText}>Go to Login</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </ThemedView>
-    </SafeAreaView>
+              {/* Top Answers Card */}
+              <BlurView intensity={20} style={styles.glassCard}>
+                <LinearGradient
+                  colors={[
+                    "rgba(236, 72, 153, 0.1)",
+                    "rgba(168, 85, 247, 0.05)",
+                  ]}
+                  style={styles.cardGradient}
+                >
+                  <View style={styles.cardHeader}>
+                    <View style={styles.sectionBadge}>
+                      <ThemedText style={styles.badgeText}>
+                        TOP ANSWERS
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  {topAnswers && topAnswers.length > 0 ? (
+                    <View style={styles.answersContainer}>
+                      {topAnswers.slice(0, 2).map((item) => (
+                        <BlurView
+                          key={item._id}
+                          intensity={10}
+                          style={styles.answerCard}
+                        >
+                          <View style={styles.answerContent}>
+                            <ThemedText style={styles.questionText}>
+                              {item.question_text}
+                            </ThemedText>
+                            <ThemedText style={styles.answerText}>
+                              "{item.answer_text}"
+                            </ThemedText>
+                            <View style={styles.answerMeta}>
+                              <ThemedText style={styles.dateText}>
+                                {item.date}
+                              </ThemedText>
+                              <View style={styles.votesContainer}>
+                                <ThemedText style={styles.votesText}>
+                                  {item.votes || 0} ♥
+                                </ThemedText>
+                              </View>
+                            </View>
+                          </View>
+                        </BlurView>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={styles.emptyState}>
+                      <ThemedText style={styles.emptyText}>
+                        No answers yet. Start participating to see your top
+                        answers here!
+                      </ThemedText>
+                    </View>
+                  )}
+                </LinearGradient>
+              </BlurView>
+
+              <BlurView intensity={20} style={styles.glassCard}>
+                <LinearGradient
+                  colors={[
+                    "rgba(34, 197, 94, 0.1)",
+                    "rgba(16, 185, 129, 0.05)",
+                  ]}
+                  style={styles.cardGradient}
+                >
+                  <TouchableOpacity
+                    onPress={() => setShowLeaderboard(true)}
+                    style={styles.actionButton}
+                  >
+                    <View style={styles.buttonContent}>
+                      <ThemedText style={styles.actionButtonText}>
+                        View Global Leaderboard
+                      </ThemedText>
+                      <ThemedText style={styles.buttonArrow}>→</ThemedText>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleLogout}
+                    style={[styles.actionButton, styles.logoutButton]}
+                  >
+                    <View style={styles.buttonContent}>
+                      <ThemedText style={styles.logoutButtonText}>
+                        Log Out
+                      </ThemedText>
+                      <ThemedText style={styles.logoutArrow}>→</ThemedText>
+                    </View>
+                  </TouchableOpacity>
+                </LinearGradient>
+              </BlurView>
+
+              <Modal
+                animationType="slide"
+                transparent={false}
+                visible={showLeaderboard}
+                onRequestClose={() => setShowLeaderboard(false)}
+              >
+                <LinearGradient
+                  colors={["#0F0F23", "#1A1A3E", "#2D1B69"]}
+                  style={styles.modalContainer}
+                >
+                  <SafeAreaView style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                      <ThemedText style={styles.modalTitle}>
+                        Global Leaderboard
+                      </ThemedText>
+                      {ranking && (
+                        <BlurView intensity={10} style={styles.rankingCard}>
+                          <ThemedText style={styles.rankingText}>
+                            Your Rank: #{ranking.rank} out of{" "}
+                            {ranking.total_users} users
+                          </ThemedText>
+                        </BlurView>
+                      )}
+                    </View>
+
+                    <ScrollView
+                      contentContainerStyle={styles.leaderboardScrollContainer}
+                      showsVerticalScrollIndicator={false}
+                    >
+                      {leaderboard.map((item) => {
+                        const isCurrentUser = item.user_id === userId;
+                        return (
+                          <BlurView
+                            key={item.user_id}
+                            intensity={15}
+                            style={[
+                              styles.leaderboardItem,
+                              isCurrentUser && styles.currentUserItem,
+                            ]}
+                          >
+                            <View style={styles.rankContainer}>
+                              <View
+                                style={[
+                                  styles.rankBadge,
+                                  item.rank === 1 && styles.firstPlace,
+                                  item.rank === 2 && styles.secondPlace,
+                                  item.rank === 3 && styles.thirdPlace,
+                                  isCurrentUser && styles.currentUserRank,
+                                ]}
+                              >
+                                <ThemedText
+                                  style={[
+                                    styles.rankNumber,
+                                    item.rank <= 3 && styles.topRankNumber,
+                                    isCurrentUser && styles.currentUserText,
+                                  ]}
+                                >
+                                  {item.rank}
+                                </ThemedText>
+                              </View>
+                            </View>
+
+                            <View style={styles.userInfoContainer}>
+                              {item.avatar_url ? (
+                                <Image
+                                  source={{ uri: item.avatar_url }}
+                                  style={styles.leaderboardAvatar}
+                                />
+                              ) : (
+                                <View
+                                  style={[
+                                    styles.leaderboardAvatarPlaceholder,
+                                    isCurrentUser && styles.currentUserAvatar,
+                                  ]}
+                                >
+                                  <ThemedText
+                                    style={styles.leaderboardAvatarText}
+                                  >
+                                    {(item.name || item.username)
+                                      ?.charAt(0)
+                                      .toUpperCase() || "?"}
+                                  </ThemedText>
+                                </View>
+                              )}
+                              <View style={styles.userDetails}>
+                                <ThemedText
+                                  style={[
+                                    styles.leaderboardUsername,
+                                    isCurrentUser && styles.currentUserText,
+                                  ]}
+                                >
+                                  {item.name || item.username}
+                                  {isCurrentUser && " (You)"}
+                                </ThemedText>
+                                <ThemedText
+                                  style={[
+                                    styles.leaderboardPoints,
+                                    isCurrentUser && styles.currentUserText,
+                                  ]}
+                                >
+                                  {item.total_points} points
+                                </ThemedText>
+                              </View>
+                            </View>
+                          </BlurView>
+                        );
+                      })}
+                    </ScrollView>
+
+                    <TouchableOpacity
+                      onPress={() => setShowLeaderboard(false)}
+                      style={styles.closeButton}
+                    >
+                      <ThemedText style={styles.closeButtonText}>
+                        Close
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </SafeAreaView>
+                </LinearGradient>
+              </Modal>
+            </>
+          ) : (
+            <BlurView intensity={20} style={styles.glassCard}>
+              <LinearGradient
+                colors={["rgba(239, 68, 68, 0.1)", "rgba(220, 38, 38, 0.05)"]}
+                style={styles.cardGradient}
+              >
+                <View style={styles.errorContainer}>
+                  <ThemedText style={styles.errorTitle}>
+                    Unable to load profile
+                  </ThemedText>
+                  <ThemedText style={styles.errorText}>
+                    There was an error loading your profile data.
+                  </ThemedText>
+                  <TouchableOpacity
+                    onPress={() => router.replace("/login")}
+                    style={styles.loginButton}
+                  >
+                    <ThemedText style={styles.loginButtonText}>
+                      Go to Login
+                    </ThemedText>
+                    <ThemedText style={styles.buttonArrow}>→</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </LinearGradient>
+            </BlurView>
+          )}
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
+  container: {
+    flex: 1,
+  },
+  scrollContainer: {
+    padding: 20,
+    paddingTop: 40,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
-  },
-  loadingContent: {
-    alignItems: "center",
-    justifyContent: "center",
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: "#666",
-    textAlign: "center",
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "300",
   },
   loadingPlaceholders: {
     marginTop: 40,
@@ -314,151 +462,387 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "rgba(255,255,255,0.1)",
     marginBottom: 20,
   },
   textLoadingPlaceholder: {
     height: 20,
     width: 150,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "rgba(255,255,255,0.1)",
     borderRadius: 4,
     marginBottom: 10,
   },
-  header: { alignItems: "center", marginBottom: 20 },
-  avatar: { width: 80, height: 80, borderRadius: 40 },
+
+  glassCard: {
+    borderRadius: 24,
+    marginBottom: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  cardGradient: {
+    padding: 24,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  profileHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 20,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
   avatarPlaceholder: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#ddd",
+    backgroundColor: "rgba(139, 92, 246, 0.2)",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "rgba(139, 92, 246, 0.3)",
   },
-  avatarPlaceholderText: { fontSize: 28, color: "#555" },
-  username: { marginTop: 10, fontSize: 24, fontWeight: "bold" },
-  points: { marginTop: 5, fontSize: 16, color: "#666" },
-  section: { marginTop: 20 },
-  sectionTitle: { marginBottom: 10, fontSize: 18, fontWeight: "600" },
-  answerItem: {
-    marginBottom: 10,
-    padding: 15,
+  avatarPlaceholderText: {
+    fontSize: 32,
+    color: "#8B5CF6",
+    fontWeight: "600",
+    lineHeight: 30,
+  },
+  username: {
+    fontSize: 28,
+    color: "#fff",
+    fontWeight: "700",
+    marginBottom: 8,
+    letterSpacing: -0.5,
+    lineHeight: 35,
+  },
+  pointsBadge: {
+    backgroundColor: "rgba(139, 92, 246, 0.2)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignSelf: "flex-start",
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    backgroundColor: "#fff",
+    borderColor: "rgba(139, 92, 246, 0.3)",
   },
-  questionText: { fontSize: 14, fontWeight: "500", marginBottom: 5 },
-  answerText: { fontStyle: "italic", marginBottom: 5, fontSize: 14 },
-  votesText: { fontSize: 12, color: "#666" },
+  pointsText: {
+    fontSize: 16,
+    color: "#8B5CF6",
+    fontWeight: "600",
+  },
+
+  sectionBadge: {
+    backgroundColor: "rgba(236, 72, 153, 0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(236, 72, 153, 0.3)",
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#fff",
+    letterSpacing: 1,
+  },
+
+  answersContainer: {
+    gap: 16,
+  },
+  answerCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  answerContent: {
+    padding: 20,
+  },
+  questionText: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "600",
+    marginBottom: 8,
+    lineHeight: 22,
+  },
+  answerText: {
+    fontSize: 15,
+    color: "rgba(255,255,255,0.8)",
+    fontStyle: "italic",
+    lineHeight: 21,
+    marginBottom: 12,
+  },
+  answerMeta: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  dateText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "400",
+  },
+  votesContainer: {
+    backgroundColor: "rgba(236, 72, 153, 0.2)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  votesText: {
+    fontSize: 12,
+    color: "#EC4899",
+    fontWeight: "600",
+  },
+
+  emptyState: {
+    padding: 20,
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "rgba(255,255,255,0.6)",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+
+  actionButton: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  logoutButton: {
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderColor: "rgba(239, 68, 68, 0.2)",
+    marginBottom: 0,
+  },
+  buttonContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "600",
+  },
+  logoutButtonText: {
+    fontSize: 16,
+    color: "#EF4444",
+    fontWeight: "600",
+  },
+  buttonArrow: {
+    fontSize: 18,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "300",
+  },
+  logoutArrow: {
+    fontSize: 18,
+    color: "#EF4444",
+    fontWeight: "300",
+  },
+
+  modalContainer: {
+    flex: 1,
+  },
+  modalContent: {
+    flex: 1,
+    padding: 20,
+  },
+  modalHeader: {
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  modalTitle: {
+    fontSize: 28,
+    color: "#fff",
+    fontWeight: "700",
+    marginBottom: 16,
+    letterSpacing: -0.5,
+    lineHeight: 35,
+  },
+  rankingCard: {
+    backgroundColor: "rgba(139, 92, 246, 0.1)",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.2)",
+  },
   rankingText: {
     fontSize: 16,
-    textAlign: "center",
-    padding: 10,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 8,
-    marginBottom: 15,
+    color: "#8B5CF6",
     fontWeight: "600",
-    marginLeft: 12,
-    marginRight: 12,
+    textAlign: "center",
   },
-  leaderboardContainer: {
-    borderWidth: 2,
-    borderColor: "#007AFF",
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 10,
+
+  leaderboardScrollContainer: {
+    gap: 12,
   },
-  leaderboardList: { maxHeight: 300 },
   leaderboardItem: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
-    marginBottom: 8,
-    backgroundColor: "#fff",
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    marginLeft: 10,
-    marginRight: 10,
+    borderColor: "rgba(255,255,255,0.1)",
   },
-  currentUserItem: { backgroundColor: "#007AFF10", borderColor: "#007AFF" },
-  rankContainer: { width: 40, alignItems: "center" },
-  rankNumber: { fontSize: 16, fontWeight: "bold", color: "#666" },
-  currentUserText: { color: "#007AFF" },
+  currentUserItem: {
+    backgroundColor: "rgba(139, 92, 246, 0.1)",
+    borderColor: "rgba(139, 92, 246, 0.3)",
+  },
+  rankContainer: {
+    width: 50,
+    alignItems: "center",
+  },
+  rankBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  firstPlace: {
+    backgroundColor: "rgba(251, 191, 36, 0.2)",
+    borderColor: "rgba(251, 191, 36, 0.4)",
+  },
+  secondPlace: {
+    backgroundColor: "rgba(156, 163, 175, 0.2)",
+    borderColor: "rgba(156, 163, 175, 0.4)",
+  },
+  thirdPlace: {
+    backgroundColor: "rgba(205, 127, 50, 0.2)",
+    borderColor: "rgba(205, 127, 50, 0.4)",
+  },
+  currentUserRank: {
+    backgroundColor: "rgba(139, 92, 246, 0.2)",
+    borderColor: "rgba(139, 92, 246, 0.4)",
+  },
+  rankNumber: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.7)",
+  },
+  topRankNumber: {
+    color: "#fff",
+  },
+  currentUserText: {
+    color: "#8B5CF6",
+  },
   userInfoContainer: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: 15,
+    marginLeft: 16,
   },
-  leaderboardAvatar: { width: 40, height: 40, borderRadius: 20 },
+  leaderboardAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
   leaderboardAvatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#ddd",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.1)",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
-  currentUserAvatar: { backgroundColor: "#007AFF20" },
-  leaderboardAvatarText: { fontSize: 16, color: "#555", fontWeight: "600" },
-  userDetails: { flex: 1, marginLeft: 12 },
-  leaderboardUsername: { fontSize: 16, fontWeight: "600", marginBottom: 2 },
-  leaderboardPoints: { fontSize: 14, color: "#666" },
-  logoutButton: {
-    marginTop: 30,
-    padding: 15,
-    backgroundColor: "#63264a",
-    borderRadius: 8,
-    alignItems: "center",
+  currentUserAvatar: {
+    backgroundColor: "rgba(139, 92, 246, 0.2)",
+    borderColor: "rgba(139, 92, 246, 0.3)",
   },
-  logoutText: { color: "white", fontSize: 16, fontWeight: "600" },
-  errorContainer: {
+  leaderboardAvatarText: {
+    fontSize: 18,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "600",
+  },
+  userDetails: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 20,
+    marginLeft: 12,
   },
-  loginButton: {
-    padding: 15,
-    backgroundColor: "#007AFF",
-    borderRadius: 8,
-    alignItems: "center",
+  leaderboardUsername: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "600",
+    marginBottom: 2,
   },
-  loginButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
-  leaderboardButton: {
-    marginTop: 10,
-    padding: 15,
-    backgroundColor: "#c0d684",
-    borderRadius: 8,
-    alignItems: "center",
+  leaderboardPoints: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.6)",
+    fontWeight: "400",
   },
-  leaderboardButtonText: {
-    color: "white",
+
+  closeButton: {
+    backgroundColor: "rgba(239, 68, 68, 0.8)",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.3)",
+    width: "90%",
+    alignSelf: "center",
+  },
+  closeButtonText: {
+    color: "#fff",
     fontSize: 16,
     fontWeight: "600",
   },
-  modalContainer: {
-    flex: 1,
-    padding: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  closeButton: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: "#FF3B30",
-    borderRadius: 8,
+
+  errorContainer: {
     alignItems: "center",
-    marginLeft: 12,
-    marginRight: 12,
+    gap: 16,
   },
-  closeButtonText: {
-    color: "white",
+  errorTitle: {
+    fontSize: 24,
+    color: "#EF4444",
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 16,
+    color: "rgba(255,255,255,0.7)",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  loginButton: {
+    backgroundColor: "rgba(139, 92, 246, 0.8)",
+    borderRadius: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.3)",
+  },
+  loginButtonText: {
+    color: "#fff",
     fontSize: 16,
     fontWeight: "600",
   },

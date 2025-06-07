@@ -16,12 +16,10 @@ def serialize_document(doc):
     """Helper function to serialize MongoDB documents for JSON response"""
     if doc is None:
         return None
-    
-    # Convert ObjectId to string
+
     if "_id" in doc:
         doc["_id"] = str(doc["_id"])
     
-    # Convert any ObjectId fields to strings
     for key, value in doc.items():
         if isinstance(value, ObjectId):
             doc[key] = str(value)
@@ -59,8 +57,6 @@ def get_todays_question():
 @app.route('/today/has-answered/<user_id>')
 def has_answered_today(user_id):
     try:
-        print("DEBUG: has_answered_today")
-        # Convert string ID to ObjectId
         object_id = ObjectId(user_id)
         
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
@@ -68,10 +64,8 @@ def has_answered_today(user_id):
         questions = db["questions"]
         answers = db["answers"]
         
-        # Get today's date
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         
-        # Find today's question
         today_question = questions.find_one({"date": today})
         if not today_question:
             client.close()
@@ -80,7 +74,6 @@ def has_answered_today(user_id):
                 "error": "No question found for today"
             }), status=404, mimetype="application/json")
         
-        # Check if user has answered today's question
         existing_answer = answers.find_one({
             "user_id": object_id,
             "question_id": today_question["_id"]
@@ -104,14 +97,11 @@ def get_yesterdays_question():
     client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
     db = client[config["DB_NAME"]]
     questions = db["questions"]
-    # Get yesterday's date in the format stored in the database
     yesterday = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
-    # Find the question for yesterday
     yesterday_question = questions.find_one({"date": yesterday})
     client.close()
     
     if yesterday_question:
-        # Convert ObjectId to string for JSON serialization
         yesterday_question["_id"] = str(yesterday_question["_id"])
         yesterday_question["date"] = yesterday_question["date"].strftime("%m-%d-%Y")
         return Response(json.dumps(yesterday_question), mimetype="application/json")
@@ -122,7 +112,6 @@ def get_yesterdays_question():
 
 @app.route('/day-before-yesterday/get-question/')
 def get_day_before_yesterdays_question():
-    print("DEBUG: day-before-yesterday endpoint called!")
     try:
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
@@ -164,19 +153,16 @@ def get_user(user_id):
     try:
         from bson.objectid import ObjectId
         
-        # Convert the string ID to ObjectId
         object_id = ObjectId(user_id)
         
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         users = db["users"]
         
-        # Find the user by ObjectId
         user = users.find_one({"_id": object_id})
         client.close()
         
         if user:
-            # Serialize the user document properly
             user = serialize_document(user)
             return Response(json.dumps(user), mimetype="application/json")
         else:
@@ -191,7 +177,6 @@ def get_user(user_id):
 @app.route('/user/<user_id>/top-answers')
 def get_top_answers(user_id):
     try:
-        # Convert string ID to ObjectId
         from bson.objectid import ObjectId
         object_id = ObjectId(user_id)
         
@@ -203,18 +188,16 @@ def get_top_answers(user_id):
         # Get the user's top 5 answers sorted by votes (descending)
         user_answers = list(answers.find({"user_id": object_id}).sort("votes", -1))   
         user_answers = user_answers[:5] 
-        # Enrich answers with question text
+
         result = []
         
         for answer in user_answers:
             question_id = answer.get("question_id")
             if not isinstance(question_id, ObjectId):
-                # Convert to ObjectId if it's not already
                 question_id = ObjectId(question_id)
                 
             question = questions.find_one({"_id": question_id})
             if question:
-                # Clean serialization
                 clean_answer = {
                     "_id": str(answer["_id"]),
                     "question_id": str(answer["question_id"]),
@@ -239,7 +222,6 @@ def get_top_answers(user_id):
 @app.route('/user/<user_id>/ranking')
 def get_user_ranking(user_id):
     try:
-        # Convert string ID to ObjectId
         from bson.objectid import ObjectId
         object_id = ObjectId(user_id)
         
@@ -249,7 +231,6 @@ def get_user_ranking(user_id):
         
         all_users = list(users.find().sort("total_points", -1))
         
-        # Find the user's position in the ranking
         user_rank = None
         total_users = len(all_users)
         
@@ -282,10 +263,8 @@ def get_user_ranking(user_id):
 @app.route('/user/register', methods=['POST'])
 def register_user():
     try:
-        # Get user data from request body
         user_data = request.json
-        
-        # Validate required fields
+
         required_fields = ['username', 'password']
         for field in required_fields:
             if field not in user_data:
@@ -293,12 +272,10 @@ def register_user():
                     "error": f"Missing required field: {field}"
                 }), status=400, mimetype="application/json")
         
-        # Connect to database
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         users = db["users"]
 
-        # Check if username already exists
         existing_user = users.find_one({"username": user_data['username']})
         
         if existing_user:
@@ -307,9 +284,7 @@ def register_user():
                 "error": "Username already in use"
             }), status=409, mimetype="application/json")
         
-        # Hash the password
         hashed_password = generate_password_hash(user_data['password'])
-        # Prepare user document
         new_user = {
             "username": user_data['username'],
             "password": hashed_password,
@@ -318,18 +293,15 @@ def register_user():
             "groups": []
         }
         
-        # Add optional fields if provided
         if 'name' in user_data:
             new_user['name'] = user_data['name']
         
         if 'avatar_url' in user_data:
             new_user['avatar_url'] = user_data['avatar_url']
         
-        # Insert new user
         result = users.insert_one(new_user)
         user_id = str(result.inserted_id)
         
-        # Close connection
         client.close()
         print("got here 4")
         print(user_data['username'])
@@ -348,10 +320,8 @@ def register_user():
 @app.route('/user/login', methods=['POST'])
 def login_user():
     try:
-        # Get login data from request body
         login_data = request.json
         
-        # Validate required fields
         required_fields = ['username', 'password']
         for field in required_fields:
             if field not in login_data:
@@ -359,12 +329,10 @@ def login_user():
                     "error": f"Missing required field: {field}"
                 }), status=400, mimetype="application/json")
         
-        # Connect to database
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         users = db["users"]
-        
-        # Find user by username
+
         user = users.find_one({"username": login_data['username']})
         
         if not user:
@@ -373,21 +341,18 @@ def login_user():
                 "error": "Invalid username or password"
             }), status=401, mimetype="application/json")
         
-        # Verify password
         if not check_password_hash(user['password'], login_data['password']):
             client.close()
             return Response(json.dumps({
                 "error": "Invalid username or password"
             }), status=401, mimetype="application/json")
         
-        # Prepare response data (clean serialization)
         user_data = {
             "user_id": str(user["_id"]),
             "username": user["username"],
             "total_points": user.get("total_points", 0)
         }
-        
-        # Add optional fields if they exist
+
         if "name" in user:
             user_data["name"] = user["name"]
         if "avatar_url" in user:
@@ -412,7 +377,6 @@ def get_leaderboard():
         # Get limit parameter (default to 10)
         limit = int(request.args.get('limit', 10))
         
-        # Connect to database
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         users = db["users"]
@@ -422,7 +386,6 @@ def get_leaderboard():
             {"username": 1, "total_points": 1, "avatar_url": 1, "name": 1}
         ).sort("total_points", -1).limit(limit))
         
-        # Format the response
         result = []
         for index, user in enumerate(leaderboard_users):
             user_data = {
@@ -432,7 +395,6 @@ def get_leaderboard():
                 "rank": index + 1  # Add 1 because ranks start at 1, not 0
             }
             
-            # Add optional fields if they exist
             if "name" in user:
                 user_data["name"] = user["name"]
             if "avatar_url" in user:
@@ -456,12 +418,9 @@ def get_leaderboard():
 @app.route('/question/<question_id>/get_pair', methods=['GET'])
 def get_pair(question_id):
     try:
-        print(f"\nDEBUG: get_pair called with question_id = {question_id}")
 
-        # 1) Convert question_id to ObjectId
         try:
             object_id = ObjectId(question_id)
-            print("DEBUG: converted to ObjectId")
         except Exception as e:
             print("ERROR: question_id is not a valid ObjectId:", e)
             return Response(
@@ -470,13 +429,11 @@ def get_pair(question_id):
                 mimetype="application/json"
             )
 
-        # 2) Connect to Mongo
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         answers_col = db["answers"]
         questions_col = db["questions"]
 
-        # 3) Verify the question exists
         question_doc = questions_col.find_one({"_id": object_id})
         if not question_doc:
             print("DEBUG: No question found with that _id")
@@ -486,20 +443,14 @@ def get_pair(question_id):
                 status=404,
                 mimetype="application/json"
             )
-        print("DEBUG: found question, text =", question_doc.get("question"))
-
-        # 4) Count how many answers exist for this question_id (just for logging)
         count = answers_col.count_documents({"question_id": object_id})
-        print(f"DEBUG: count of answers for this question = {count}")
 
-        # 5) Sample two random answers
         raw_answers = list(answers_col.aggregate([
             {"$match": {"question_id": object_id}},
             {"$sample": {"size": 2}}
         ]))
         print("DEBUG: raw sampled answers (before cleaning) =", raw_answers)
 
-        # 6) Build a clean, JSON‐serializable list
         enriched_answers = []
         for ans in raw_answers:
             clean_ans = {
@@ -509,7 +460,6 @@ def get_pair(question_id):
                 "answer_text": ans.get("answer_text", ""),
                 "votes": ans.get("votes", 0),
                 "appearances": ans.get("appearances", 0),
-                # Add the question text + date (formatted as MM-DD-YYYY)
                 "question_text": question_doc["question"],
                 "date": question_doc["date"].strftime("%m-%d-%Y")
             }
@@ -541,7 +491,6 @@ def increment_appearance_count(answer_id):
         from bson.objectid import ObjectId
         object_id = ObjectId(answer_id)
 
-        # Increment the 'appearances' field by 1 (create it if it doesn't exist)
         result = answers.update_one(
             {"_id": object_id},
             {"$inc": {"appearances": 1}}
@@ -567,7 +516,6 @@ def increment_vote_count(answer_id):
         from bson.objectid import ObjectId
         object_id = ObjectId(answer_id)
 
-        # Increment the 'votes' field by 1 (create it if it doesn't exist)
         result = answers.update_one(
             {"_id": object_id},
             {"$inc": {"votes": 1}}
@@ -586,7 +534,6 @@ def increment_vote_count(answer_id):
 @app.route('/question/<question_id>/answer_leaderboard', methods=['GET'])
 def get_answer_leaderboard(question_id):
     try:
-        # 1) Convert question_id to ObjectId (400 if invalid)
         try:
             object_id = ObjectId(question_id)
         except Exception as e:
@@ -596,24 +543,19 @@ def get_answer_leaderboard(question_id):
                 mimetype="application/json"
             )
 
-        # 2) Connect to MongoDB
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         answers_col = db["answers"]
         users_col = db["users"]
 
-        # 3) Fetch all answer documents for this question
         answer_cursor = answers_col.find({"question_id": object_id})
 
         enriched = []
         for ans in answer_cursor:
-            # Compute votes / appearances ratio
             votes = ans.get("votes", 0)
             appearances = ans.get("appearances", 1)
             appearances = max(appearances, 1)
             ratio = votes / appearances
-
-            # 4) Build a clean answer object (no datetime fields)
             clean_ans = {
                 "_id": str(ans["_id"]),
                 "question_id": str(ans["question_id"]),
@@ -623,7 +565,6 @@ def get_answer_leaderboard(question_id):
                 "appearances": appearances
             }
 
-            # 5) Lookup the user who posted this answer
             user_doc = users_col.find_one({"_id": ObjectId(ans["user_id"])})
             if user_doc:
                 clean_user = {
@@ -648,16 +589,13 @@ def get_answer_leaderboard(question_id):
 
         client.close()
 
-        # 6) Sort by ratio descending
         enriched.sort(key=lambda x: x["ratio"], reverse=True)
 
-        # 7) Drop the ratio before returning
         result = [{"answer": item["answer"], "user": item["user"]} for item in enriched]
 
         return Response(json.dumps(result), mimetype="application/json")
 
     except Exception as e:
-        # Catch any unexpected error
         return Response(
             json.dumps({"error": str(e)}),
             status=500,
@@ -677,7 +615,6 @@ def create_answer():
                     mimetype="application/json"
                 )
 
-        # Convert string IDs into ObjectId
         user_oid = ObjectId(data["user_id"])
         question_oid = ObjectId(data["question_id"])
 
@@ -685,7 +622,6 @@ def create_answer():
         db = client[config["DB_NAME"]]
         answers_col = db["answers"]
 
-        # ─── Check for an existing answer by this user for this question ───
         existing = answers_col.find_one({
             "user_id": user_oid,
             "question_id": question_oid
@@ -698,7 +634,6 @@ def create_answer():
                 mimetype="application/json"
             )
 
-        # Insert new answer:
         new_ans = {
             "user_id": user_oid,
             "question_id": question_oid,
@@ -743,7 +678,6 @@ def get_user_by_username(username: str):
                 mimetype="application/json"
             )
 
-        # Clean serialization - only return safe fields
         return Response(
             json.dumps({
                 "user_id": str(user["_id"]),
@@ -764,10 +698,8 @@ def get_user_by_username(username: str):
 @app.route('/groups/create-group', methods=['POST'])
 def create_group():
     try:
-        # Get group data from request body
         group_data = request.json
         
-        # Validate required fields
         required_fields = ['group_name', 'password', 'username']
         for field in required_fields:
             if field not in group_data:
@@ -776,13 +708,11 @@ def create_group():
                 }), status=400, mimetype="application/json")
         
 
-        # Connect to database
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         groups = db["groups"]
         users = db["users"]
         
-        # Check if group name already exists
         existing_group = groups.find_one({"group_name": group_data['group_name']})
         
         if existing_group:
@@ -791,18 +721,15 @@ def create_group():
                 "error": "Group name already in use"
             }), status=409, mimetype="application/json")
         
-        # Hash the password
         hashed_password = generate_password_hash(group_data['password'])
 
-        # Prepare group document
         new_group = {
             "group_name": group_data['group_name'],
             "password": hashed_password,
             "group_size": 1,
-            "members": [group_data['username']],  # Initialize with creator as first member
+            "members": [group_data['username']],
         }
         
-        # Insert new group
         result = groups.insert_one(new_group)
         group_id = str(result.inserted_id)
 
@@ -826,13 +753,11 @@ def create_group():
 @app.route('/groups/get-groups/<username>', methods=['GET'])
 def get_user_groups(username):
     try:
-        # Connect to database
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         users = db["users"]
         groups = db["groups"]
         
-        # Find the user
         user = users.find_one({"username": username})
         
         if not user:
@@ -841,10 +766,8 @@ def get_user_groups(username):
                 "error": "User not found"
             }), status=404, mimetype="application/json")
         
-        # Get the user's groups list (default to empty list if not present)
         user_groups = user.get("groups", [])
-        
-        # Get group details including member count
+
         group_details = []
         for group_name in user_groups:
             group = groups.find_one({"group_name": group_name})
@@ -869,10 +792,8 @@ def get_user_groups(username):
 @app.route('/groups/join-group', methods=['POST'])
 def join_group():
     try:
-        # Get join data from request body
         join_data = request.json
-        
-        # Validate required fields
+
         required_fields = ['group_name', 'password', 'username']
         for field in required_fields:
             if field not in join_data:
@@ -880,13 +801,11 @@ def join_group():
                     "error": f"Missing required field: {field}"
                 }), status=400, mimetype="application/json")
         
-        # Connect to database
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         groups = db["groups"]
         users = db["users"]
         
-        # Find the group
         group = groups.find_one({"group_name": join_data['group_name']})
         
         if not group:
@@ -895,21 +814,18 @@ def join_group():
                 "error": "Group not found"
             }), status=404, mimetype="application/json")
         
-        # Verify password
         if not check_password_hash(group['password'], join_data['password']):
             client.close()
             return Response(json.dumps({
                 "error": "Incorrect password"
             }), status=401, mimetype="application/json")
         
-        # Check if user is already in the group
         if join_data['username'] in group['members']:
             client.close()
             return Response(json.dumps({
                 "error": "User is already a member of this group"
             }), status=409, mimetype="application/json")
         
-        # Find the user
         user = users.find_one({"username": join_data['username']})
         if not user:
             client.close()
@@ -917,13 +833,11 @@ def join_group():
                 "error": "User not found"
             }), status=404, mimetype="application/json")
         
-        # Add user to group's members
         groups.update_one(
             {"group_name": join_data['group_name']},
             {"$push": {"members": join_data['username']}}
         )
         
-        # Add group to user's groups
         users.update_one(
             {"username": join_data['username']},
             {"$push": {"groups": join_data['group_name']}}
@@ -943,13 +857,11 @@ def join_group():
 @app.route('/groups/leaderboard/<group_name>', methods=['GET'])
 def get_group_leaderboard(group_name):
     try:
-        # Connect to database
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         groups = db["groups"]
         users = db["users"]
         
-        # Find the group
         group = groups.find_one({"group_name": group_name})
         if not group:
             client.close()
@@ -957,15 +869,12 @@ def get_group_leaderboard(group_name):
                 "error": "Group not found"
             }), status=404, mimetype="application/json")
         
-        # Get all users who are members of this group
         group_members = group.get("members", [])
         
-        # Get all users in the group with their details
         user_cursor = users.find({"username": {"$in": group_members}})
         
         enriched = []
         for user in user_cursor:
-            # Clean serialization of user data
             clean_user = {
                 "_id": str(user["_id"]),
                 "username": user.get("username", ""),
@@ -977,10 +886,8 @@ def get_group_leaderboard(group_name):
         
         client.close()
         
-        # Sort by total_points descending
         enriched.sort(key=lambda x: x["total_points"], reverse=True)
         
-        # Add ranks
         for index, user in enumerate(enriched):
             user["rank"] = index + 1
         
@@ -998,7 +905,6 @@ def get_group_leaderboard(group_name):
 @app.route('/groups/<group_name>/answer-leaderboard/<question_id>', methods=['GET'])
 def get_group_answer_leaderboard(group_name, question_id):
     try:
-        # Convert question_id to ObjectId
         try:
             object_id = ObjectId(question_id)
         except Exception as e:
@@ -1007,15 +913,13 @@ def get_group_answer_leaderboard(group_name, question_id):
                 status=400,
                 mimetype="application/json"
             )
-
-        # Connect to MongoDB
+        
         client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
         db = client[config["DB_NAME"]]
         groups = db["groups"]
         answers_col = db["answers"]
         users_col = db["users"]
 
-        # Find the group and get its members
         group = groups.find_one({"group_name": group_name})
         if not group:
             client.close()
@@ -1025,23 +929,18 @@ def get_group_answer_leaderboard(group_name, question_id):
         
         group_members = group.get("members", [])
 
-        # Get all answers for this question
         answer_cursor = answers_col.find({"question_id": object_id})
 
         enriched = []
         for ans in answer_cursor:
-            # Get the user who posted this answer
             user_doc = users_col.find_one({"_id": ObjectId(ans["user_id"])})
             
-            # Only include answers from group members
             if user_doc and user_doc.get("username") in group_members:
-                # Compute votes / appearances ratio
                 votes = ans.get("votes", 0)
                 appearances = ans.get("appearances", 1)
                 appearances = max(appearances, 1)
                 ratio = votes / appearances
 
-                # Build a clean answer object
                 clean_ans = {
                     "_id": str(ans["_id"]),
                     "question_id": str(ans["question_id"]),
@@ -1051,7 +950,6 @@ def get_group_answer_leaderboard(group_name, question_id):
                     "appearances": appearances
                 }
 
-                # Build a clean user object
                 clean_user = {
                     "_id": str(user_doc["_id"]),
                     "username": user_doc.get("username", ""),
@@ -1067,10 +965,8 @@ def get_group_answer_leaderboard(group_name, question_id):
 
         client.close()
 
-        # Sort by ratio descending
         enriched.sort(key=lambda x: x["ratio"], reverse=True)
-
-        # Drop the ratio before returning
+        
         result = [{"answer": item["answer"], "user": item["user"]} for item in enriched]
 
         return Response(json.dumps(result), mimetype="application/json")

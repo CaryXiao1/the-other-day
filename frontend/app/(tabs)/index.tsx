@@ -9,12 +9,13 @@ import {
 } from "react-native";
 import { useState, useEffect } from "react";
 import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
 import { router } from "expo-router";
 import { backendGet } from "@/backendAPI/backend";
 import { api } from "@/backendAPI/backend";
-import axios, { AxiosError, isAxiosError } from "axios";
+import axios, { isAxiosError } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 
 type Question = {
   _id: string;
@@ -160,7 +161,6 @@ export default function HomeScreen() {
         throw new Error(`Expected an array but got: ${JSON.stringify(data)}`);
       }
       if (data.length < 2) {
-        // If fewer than 2 answers exist, warn instead of crashing
         setPairAnswers([]);
         setPairError("Not enough answers available to vote on yet.");
       } else {
@@ -206,13 +206,11 @@ export default function HomeScreen() {
     }
   };
 
-  // HANDLER: VOTE SUBMIT
   const handleVote = async (answerId: string) => {
     if (!yesterdayQuestion) return;
 
     try {
       const resp = await api.post(`/answer/${answerId}/increment-vote`);
-
       await Promise.all([fetchPair(yesterdayQuestion._id)]);
     } catch (err) {
       console.error("handleVote error:", err);
@@ -254,8 +252,7 @@ export default function HomeScreen() {
         answer_text: todayAnswerText.trim(),
       });
       setTodayAnswerText("");
-      setTodayError("Answer submitted!");
-
+      setTodayError("");
       setHasAnsweredToday(true);
     } catch (err) {
       console.error("Error submitting today's answer:", err);
@@ -277,156 +274,267 @@ export default function HomeScreen() {
 
   if (!username) {
     return (
-      <ThemedView style={styles.container}>
+      <LinearGradient
+        colors={["#0F0F23", "#1A1A3E", "#2D1B69"]}
+        style={styles.container}
+      >
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" />
-          <ThemedText style={styles.loadingText}>Loading...</ThemedText>
+          <ActivityIndicator size="large" color="#8B5CF6" />
+          <ThemedText style={styles.loadingText}>Initializing...</ThemedText>
         </View>
-      </ThemedView>
+      </LinearGradient>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <ThemedView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <ThemedText type="title" style={styles.header}>
-            Hello, {username}!
-          </ThemedText>
-          <ThemedText type="subtitle" style={styles.subheader}>
-            Today's Question:
-          </ThemedText>
-          {todayQuestion ? (
-            <ThemedView style={styles.card}>
-              <ThemedText style={styles.questionText}>
-                {todayQuestion.question}
-              </ThemedText>
+    <LinearGradient
+      colors={["#0F0F23", "#1A1A3E", "#2D1B69"]}
+      style={styles.container}
+    >
+      <SafeAreaView style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.headerContainer}>
+            <ThemedText style={styles.greeting}>Welcome back</ThemedText>
+            <ThemedText style={styles.username}>{username}</ThemedText>
+            <View style={styles.headerDivider} />
+          </View>
 
-              {hasAnsweredToday ? (
-                <ThemedText style={styles.infoText}>
-                  You've already submitted today's answer.
-                </ThemedText>
-              ) : (
+          <BlurView intensity={20} style={styles.glassCard}>
+            <LinearGradient
+              colors={["rgba(139, 92, 246, 0.1)", "rgba(59, 130, 246, 0.05)"]}
+              style={styles.cardGradient}
+            >
+              <View style={styles.cardHeader}>
+                <View style={styles.todayBadge}>
+                  <ThemedText style={styles.badgeText}>TODAY</ThemedText>
+                </View>
+              </View>
+
+              {todayQuestion ? (
                 <>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Type your answer here…"
-                    placeholderTextColor="#666"
-                    value={todayAnswerText}
-                    onChangeText={setTodayAnswerText}
-                  />
+                  <ThemedText style={styles.questionTitle}>
+                    {todayQuestion.question}
+                  </ThemedText>
+
+                  {hasAnsweredToday ? (
+                    <View style={styles.completedContainer}>
+                      <View style={styles.checkmark}>
+                        <ThemedText style={styles.checkmarkText}>✓</ThemedText>
+                      </View>
+                      <ThemedText style={styles.completedText}>
+                        Answer submitted successfully
+                      </ThemedText>
+                    </View>
+                  ) : (
+                    <View style={styles.inputContainer}>
+                      <TextInput
+                        style={styles.modernInput}
+                        placeholder="Share your thoughts..."
+                        placeholderTextColor="rgba(255,255,255,0.5)"
+                        value={todayAnswerText}
+                        onChangeText={setTodayAnswerText}
+                        multiline
+                      />
+
+                      <TouchableOpacity
+                        style={[
+                          styles.submitButton,
+                          isSubmittingTodayAnswer &&
+                            styles.submitButtonDisabled,
+                        ]}
+                        onPress={handleSubmitTodayAnswer}
+                        disabled={isSubmittingTodayAnswer}
+                      >
+                        {isSubmittingTodayAnswer ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <>
+                            <ThemedText style={styles.submitButtonText}>
+                              Submit
+                            </ThemedText>
+                            <ThemedText style={styles.submitArrow}>
+                              →
+                            </ThemedText>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {todayError && (
+                    <View style={styles.errorContainer}>
+                      <ThemedText style={styles.errorText}>
+                        {todayError}
+                      </ThemedText>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <View style={styles.loadingQuestionContainer}>
+                  <ActivityIndicator color="#8B5CF6" />
+                  <ThemedText style={styles.loadingQuestionText}>
+                    Loading today's question...
+                  </ThemedText>
+                </View>
+              )}
+            </LinearGradient>
+          </BlurView>
+
+          <BlurView intensity={20} style={styles.glassCard}>
+            <LinearGradient
+              colors={["rgba(236, 72, 153, 0.1)", "rgba(168, 85, 247, 0.05)"]}
+              style={styles.cardGradient}
+            >
+              <View style={styles.cardHeader}>
+                <View style={styles.yesterdayBadge}>
+                  <ThemedText style={styles.badgeText}>VOTE</ThemedText>
+                </View>
+              </View>
+
+              {yesterdayQuestion ? (
+                <>
+                  <ThemedText style={styles.questionTitle}>
+                    {yesterdayQuestion.question}
+                  </ThemedText>
+
+                  {loadingPair ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator color="#EC4899" />
+                    </View>
+                  ) : pairAnswers.length === 2 ? (
+                    <View style={styles.votingContainer}>
+                      {pairAnswers.map((ans, idx) => (
+                        <TouchableOpacity
+                          key={ans._id}
+                          style={styles.answerOption}
+                          onPress={() => handleVote(ans._id)}
+                        >
+                          <BlurView intensity={10} style={styles.answerBlur}>
+                            <ThemedText style={styles.answerText}>
+                              {ans.answer_text}
+                            </ThemedText>
+                            <View style={styles.voteIndicator}>
+                              <ThemedText style={styles.voteText}>
+                                Vote {String.fromCharCode(65 + idx)}
+                              </ThemedText>
+                            </View>
+                          </BlurView>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ) : (
+                    <ThemedText style={styles.noAnswersText}>
+                      No answers available for voting yet
+                    </ThemedText>
+                  )}
+
+                  {pairError && (
+                    <ThemedText style={styles.errorText}>
+                      {pairError}
+                    </ThemedText>
+                  )}
 
                   <TouchableOpacity
-                    style={styles.submitButton}
-                    onPress={handleSubmitTodayAnswer}
-                    disabled={isSubmittingTodayAnswer}
+                    style={styles.nextPairButton}
+                    onPress={() =>
+                      yesterdayQuestion && fetchPair(yesterdayQuestion._id)
+                    }
                   >
-                    {isSubmittingTodayAnswer ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <ThemedText style={styles.submitButtonText}>
-                        Submit Answer
-                      </ThemedText>
-                    )}
+                    <ThemedText style={styles.nextPairText}>
+                      Next Pair
+                    </ThemedText>
+                    <ThemedText style={styles.nextPairArrow}>→</ThemedText>
                   </TouchableOpacity>
-                  {todayError ? (
-                    <ThemedText style={styles.errorText}>
-                      {todayError}
-                    </ThemedText>
-                  ) : null}
                 </>
-              )}
-            </ThemedView>
-          ) : (
-            <ActivityIndicator style={{ marginVertical: 20 }} />
-          )}
-
-          <View style={{ height: 32 }} />
-
-          <ThemedText type="subtitle" style={styles.subheader}>
-            Yesterday's Question:
-          </ThemedText>
-          {yesterdayQuestion ? (
-            <ThemedView style={styles.card}>
-              <ThemedText style={styles.questionText}>
-                {yesterdayQuestion.question}
-              </ThemedText>
-
-              {loadingPair ? (
-                <ActivityIndicator style={{ marginVertical: 20 }} />
-              ) : pairAnswers.length === 2 ? (
-                pairAnswers.map((ans, idx) => (
-                  <ThemedView key={ans._id} style={styles.answerCard}>
-                    <ThemedText style={styles.answerText}>
-                      {ans.answer_text}
-                    </ThemedText>
-                    <TouchableOpacity
-                      style={styles.voteButton}
-                      onPress={() => handleVote(ans._id)}
-                    >
-                      <ThemedText style={styles.voteButtonText}>
-                        Vote for Answer {idx + 1}
-                      </ThemedText>
-                    </TouchableOpacity>
-                  </ThemedView>
-                ))
               ) : (
-                <ThemedText>No answers available right now.</ThemedText>
+                <ActivityIndicator color="#EC4899" />
+              )}
+            </LinearGradient>
+          </BlurView>
+
+          <BlurView intensity={20} style={styles.glassCard}>
+            <LinearGradient
+              colors={["rgba(34, 197, 94, 0.1)", "rgba(16, 185, 129, 0.05)"]}
+              style={styles.cardGradient}
+            >
+              <View style={styles.cardHeader}>
+                <View style={styles.leaderboardBadge}>
+                  <ThemedText style={styles.badgeText}>LEADERBOARD</ThemedText>
+                </View>
+              </View>
+
+              {loadingLeaderboard ? (
+                <ActivityIndicator
+                  color="#22C55E"
+                  style={{ marginVertical: 20 }}
+                />
+              ) : leaderboardEntries.length ? (
+                <View style={styles.leaderboardContainer}>
+                  {leaderboardEntries.slice(0, 5).map((item, idx) => (
+                    <View key={item.answer._id} style={styles.leaderboardItem}>
+                      <View style={styles.rankContainer}>
+                        <View
+                          style={[
+                            styles.rankBadge,
+                            idx === 0 && styles.firstPlace,
+                            idx === 1 && styles.secondPlace,
+                            idx === 2 && styles.thirdPlace,
+                          ]}
+                        >
+                          <ThemedText
+                            style={[
+                              styles.rankNumber,
+                              idx < 3 && styles.topRankNumber,
+                            ]}
+                          >
+                            {idx + 1}
+                          </ThemedText>
+                        </View>
+                      </View>
+
+                      <View style={styles.leaderboardContent}>
+                        <ThemedText
+                          style={styles.leaderboardAnswer}
+                          numberOfLines={2}
+                        >
+                          {item.answer.answer_text}
+                        </ThemedText>
+                        <View style={styles.leaderboardMeta}>
+                          <ThemedText style={styles.authorText}>
+                            @{item.user.username}
+                          </ThemedText>
+                          <View style={styles.statsContainer}>
+                            <ThemedText style={styles.statsText}>
+                              {item.answer.votes ?? 0} ♥{" "}
+                              {item.answer.appearances ?? 0} 👁
+                            </ThemedText>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <ThemedText style={styles.noLeaderboardText}>
+                  Leaderboard coming soon...
+                </ThemedText>
               )}
 
-              {pairError ? (
-                <ThemedText style={styles.errorText}>{pairError}</ThemedText>
-              ) : null}
-
-              <TouchableOpacity
-                style={styles.nextPairButton}
-                onPress={() =>
-                  yesterdayQuestion && fetchPair(yesterdayQuestion._id)
-                }
-              >
-                <ThemedText style={styles.nextPairText}>Next Pair →</ThemedText>
-              </TouchableOpacity>
-            </ThemedView>
-          ) : (
-            <ActivityIndicator style={{ marginVertical: 20 }} />
-          )}
-
-          <View style={{ height: 32 }} />
-          <ThemedText type="subtitle" style={styles.subheader}>
-            The Other Day's Leaderboard:
-          </ThemedText>
-          {loadingLeaderboard ? (
-            <ActivityIndicator style={{ marginVertical: 20 }} />
-          ) : leaderboardEntries.length ? (
-            leaderboardEntries.map((item, idx) => (
-              <ThemedView key={item.answer._id} style={styles.leaderboardCard}>
-                <ThemedText style={styles.rankText}>#{idx + 1}</ThemedText>
-                <ThemedText style={styles.answerText}>
-                  {item.answer.answer_text}
+              {leaderboardError && (
+                <ThemedText style={styles.errorText}>
+                  {leaderboardError}
                 </ThemedText>
-                <ThemedText style={styles.byLine}>
-                  — {item.user.username}
-                </ThemedText>
-                <ThemedText style={styles.ratioText}>
-                  Votes: {item.answer.votes ?? 0} Appearances:{" "}
-                  {item.answer.appearances ?? 0}
-                </ThemedText>
-              </ThemedView>
-            ))
-          ) : (
-            <ThemedText style={styles.noLeaderboardText}>
-              No leaderboard entries yet.
-            </ThemedText>
-          )}
+              )}
+            </LinearGradient>
+          </BlurView>
 
-          {leaderboardError ? (
-            <ThemedText style={styles.errorText}>{leaderboardError}</ThemedText>
-          ) : null}
-
-          <View style={{ height: 60 }} />
+          <View style={{ height: 40 }} />
         </ScrollView>
-      </ThemedView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
@@ -436,7 +544,7 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     padding: 20,
-    paddingBottom: 60,
+    paddingTop: 40,
   },
   loadingContainer: {
     flex: 1,
@@ -444,132 +552,308 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 16,
     fontSize: 16,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "300",
   },
-
-  header: {
-    fontSize: 28,
-    textAlign: "center",
-    marginBottom: 16,
+  headerContainer: {
+    alignItems: "center",
+    marginBottom: 40,
   },
-  subheader: {
-    fontSize: 20,
-    marginBottom: 8,
+  greeting: {
+    fontSize: 16,
+    color: "rgba(255,255,255,0.6)",
+    fontWeight: "300",
+    letterSpacing: 0.5,
   },
-
-  card: {
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    marginBottom: 16,
+  username: {
+    fontSize: 32,
+    color: "#fff",
+    fontWeight: "700",
+    marginTop: 5,
+    letterSpacing: -0.5,
+    lineHeight: 35,
   },
-  leaderboardCard: {
-    backgroundColor: "#fff",
-    padding: 14,
-    borderRadius: 8,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+  headerDivider: {
+    width: 60,
+    height: 2,
+    backgroundColor: "#8B5CF6",
+    marginTop: 16,
+    borderRadius: 1,
   },
-
-  questionText: {
-    fontSize: 18,
-    marginBottom: 12,
-  },
-  input: {
-    height: 44,
+  glassCard: {
+    borderRadius: 24,
+    marginBottom: 24,
+    overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  cardGradient: {
+    padding: 24,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  todayBadge: {
+    backgroundColor: "rgba(139, 92, 246, 0.2)",
     paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.3)",
+  },
+  yesterdayBadge: {
+    backgroundColor: "rgba(236, 72, 153, 0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(236, 72, 153, 0.3)",
+  },
+  leaderboardBadge: {
+    backgroundColor: "rgba(34, 197, 94, 0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(34, 197, 94, 0.3)",
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#fff",
+    letterSpacing: 1,
+  },
+  questionTitle: {
+    fontSize: 20,
+    color: "#fff",
+    fontWeight: "600",
+    lineHeight: 28,
+    marginBottom: 24,
+  },
+  inputContainer: {
+    gap: 16,
+  },
+  modernInput: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 16,
+    padding: 16,
     fontSize: 16,
-    backgroundColor: "#f9f9f9",
-    marginBottom: 12,
+    color: "#fff",
+    minHeight: 80,
+    textAlignVertical: "top",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
   },
   submitButton: {
-    backgroundColor: "#c0d684",
-    borderRadius: 8,
-    height: 44,
+    backgroundColor: "rgba(139, 92, 246, 0.8)",
+    borderRadius: 16,
+    height: 56,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.3)",
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   submitButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
   },
-  infoText: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    padding: 12,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 8,
+  submitArrow: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "300",
   },
-
-  answerCard: {
-    backgroundColor: "#f2f2f2",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
+  completedContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    padding: 20,
+    backgroundColor: "rgba(34, 197, 94, 0.1)",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(34, 197, 94, 0.2)",
   },
-  answerText: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  voteButton: {
-    backgroundColor: "#63264a",
-    height: 40,
-    borderRadius: 6,
+  checkmark: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#22C55E",
     justifyContent: "center",
     alignItems: "center",
   },
-  voteButtonText: {
+  checkmarkText: {
     color: "#fff",
+    fontSize: 16,
     fontWeight: "600",
   },
+  completedText: {
+    color: "#22C55E",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  votingContainer: {
+    gap: 16,
+    marginBottom: 20,
+  },
+  answerOption: {
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  answerBlur: {
+    padding: 20,
+  },
+  answerText: {
+    fontSize: 16,
+    color: "#fff",
+    lineHeight: 24,
+    marginBottom: 12,
+  },
+  voteIndicator: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(236, 72, 153, 0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  voteText: {
+    fontSize: 12,
+    color: "#EC4899",
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+
   nextPairButton: {
-    alignSelf: "flex-end",
-    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 12,
   },
   nextPairText: {
-    color: "#3d0b37",
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  nextPairArrow: {
+    color: "rgba(255,255,255,0.7)",
     fontSize: 16,
   },
-
-  rankText: {
-    fontSize: 16,
+  leaderboardContainer: {
+    gap: 16,
+  },
+  leaderboardItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 16,
+  },
+  rankContainer: {
+    minWidth: 40,
+  },
+  rankBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  firstPlace: {
+    backgroundColor: "rgba(251, 191, 36, 0.2)",
+    borderColor: "rgba(251, 191, 36, 0.4)",
+  },
+  secondPlace: {
+    backgroundColor: "rgba(156, 163, 175, 0.2)",
+    borderColor: "rgba(156, 163, 175, 0.4)",
+  },
+  thirdPlace: {
+    backgroundColor: "rgba(205, 127, 50, 0.2)",
+    borderColor: "rgba(205, 127, 50, 0.4)",
+  },
+  rankNumber: {
+    fontSize: 14,
     fontWeight: "600",
-    marginBottom: 4,
+    color: "rgba(255,255,255,0.7)",
   },
-  byLine: {
-    fontSize: 14,
-    color: "#555",
-    fontStyle: "italic",
-    marginBottom: 4,
+  topRankNumber: {
+    color: "#fff",
   },
-  ratioText: {
+  leaderboardContent: {
+    flex: 1,
+  },
+  leaderboardAnswer: {
+    fontSize: 16,
+    color: "#fff",
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  leaderboardMeta: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  authorText: {
     fontSize: 14,
-    color: "#333",
+    color: "rgba(255,255,255,0.6)",
+    fontWeight: "500",
+  },
+  statsContainer: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  statsText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "400",
+  },
+  loadingQuestionContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingVertical: 20,
+  },
+  loadingQuestionText: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 16,
+  },
+  errorContainer: {
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.2)",
+  },
+  errorText: {
+    color: "#EF4444",
+    fontSize: 14,
+    textAlign: "center",
+  },
+  noAnswersText: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 16,
+    textAlign: "center",
+    paddingVertical: 20,
   },
   noLeaderboardText: {
+    color: "rgba(255,255,255,0.6)",
     fontSize: 16,
-    color: "#666",
     textAlign: "center",
-    marginVertical: 12,
-  },
-
-  errorText: {
-    color: "#FF3B30",
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: "center",
+    paddingVertical: 20,
   },
 });
